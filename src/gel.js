@@ -10,6 +10,44 @@ export const LADDERS = {
 // Resolving range [min bp, max bp] by agarose %
 const RANGES = { 0.7: [500, 20000], 1: [250, 12000], 1.5: [120, 5000], 2: [80, 3000] };
 
+// ---------------------------------------------------------------------------
+// Monochrome palette — the look of a gel photographed on a gel doc, where the
+// image is a single channel and nothing is colour-coded.
+//
+// Losing hue means the ladder and the sample lanes can no longer be told apart
+// by colour, so they are separated by BRIGHTNESS instead: sample bands print at
+// full strength and the ladder deliberately dimmer, which is also how a
+// mass-adjusted ladder actually exposes next to a concentrated digest. The
+// ladder additionally keeps its caption and the dashed divider, so the cue is
+// not carried by tone alone.
+//
+// TINT is the single hue everything derives from — set it to [255,255,255] for
+// a neutral grey gel, or something like [176,226,255] to tint it cool.
+const TINT = [255, 255, 255];
+
+/** `r,g,b` at a fraction of full strength, for interpolating into rgba(). */
+const tone = (level) => TINT.map((c) => Math.round(c * level)).join(",");
+/** A complete rgba() colour at a fraction of full strength. */
+const ink = (level, alpha = 1) => `rgba(${tone(level)},${alpha})`;
+
+// Every value is a fraction of TINT, surfaces included — so the gel is a single
+// hue throughout and changing TINT retints all of it consistently. (Deriving the
+// surfaces mattered: hand-written hex values for them carried a faint blue cast,
+// which left the "monochrome" gel quietly two-toned.)
+const GEL = {
+  backdropTop: 0.065,       // the stage the slab sits on
+  backdropBottom: 0.035,
+  slab: 0.085,              // the agarose itself
+  well: 0.02,
+  divider: 0.18,
+  laneLabel: 0.86,          // sample lane captions
+  ladderLabel: 0.56,        // ladder caption + "size standard" note
+  sizeLabel: 0.52,          // the ladder's bp labels
+  hint: 0.42,               // electrode marks, empty-state text
+  sampleBand: 1.0,          // full strength
+  ladderBand: 0.62,         // dimmer, so the reference reads as reference
+};
+
 export function renderGel(canvas, lanes, opts) {
   const { gelPct = 1, ladderKey = "1kb", exposure = 1, contrast = 0.5 } = opts;
   // The agarose % sets the physical resolving limits; the chosen ladder frames
@@ -31,11 +69,11 @@ export function renderGel(canvas, lanes, opts) {
   // --- gel slab background ---
   ctx.clearRect(0, 0, W, H);
   const bg = ctx.createLinearGradient(0, 0, 0, H);
-  bg.addColorStop(0, "#10151c");
-  bg.addColorStop(1, "#0a0e13");
+  bg.addColorStop(0, ink(GEL.backdropTop));
+  bg.addColorStop(1, ink(GEL.backdropBottom));
   ctx.fillStyle = bg;
   ctx.fillRect(0, 0, W, H);
-  ctx.fillStyle = "#141b24";
+  ctx.fillStyle = ink(GEL.slab);
   ctx.fillRect(56, 8, W - 64, H - 16);
 
   const allLanes = [{ ladder: true, label: LADDERS[ladderKey].label }, ...lanes];
@@ -58,19 +96,19 @@ export function renderGel(canvas, lanes, opts) {
     const x = 110 + (i + 0.5) * laneW;
 
     // well
-    ctx.fillStyle = "#05070a";
+    ctx.fillStyle = ink(GEL.well);
     ctx.fillRect(x - bandWidth / 2, wellY - 8, bandWidth, 10);
 
     // label
     ctx.save();
-    ctx.fillStyle = lane.ladder ? "#8fa3b8" : "#cfe3f5";
+    ctx.fillStyle = ink(lane.ladder ? GEL.ladderLabel : GEL.laneLabel);
     ctx.font = "11px system-ui, sans-serif";
     ctx.textAlign = "center";
     const label = lane.label.length > 18 ? lane.label.slice(0, 17) + "…" : lane.label;
     ctx.fillText(label, x, lane.ladder ? 18 : 22);
     if (lane.ladder) {
       // Spell out that this lane is the reference ruler, not a digest.
-      ctx.fillStyle = "#6b7d90";
+      ctx.fillStyle = ink(GEL.ladderLabel, 0.85);
       ctx.font = "italic 9px system-ui, sans-serif";
       ctx.fillText("size standard — not a digest", x, 29);
     }
@@ -125,7 +163,9 @@ export function renderGel(canvas, lanes, opts) {
 
     // Gamma-compress so faint smear detail stays visible next to a bright band,
     // the way a gel doc's exposure does.
-    const rgb = lane.ladder ? "178,205,232" : lane.uncut ? "255,190,110" : "150,255,190";
+    // Uncut plasmid prints at sample strength — it is DNA, and its "uncut"
+    // caption below carries the distinction that orange used to.
+    const rgb = tone(lane.ladder ? GEL.ladderBand : GEL.sampleBand);
     const left = x - bandWidth / 2;
     ctx.save();
     // Wide, faint pass first: the fluorescent halo around a stained band.
@@ -152,7 +192,7 @@ export function renderGel(canvas, lanes, opts) {
 
     // ladder size labels
     if (lane.ladder) {
-      ctx.fillStyle = "#7d93a8";
+      ctx.fillStyle = ink(GEL.sizeLabel);
       ctx.font = "10px system-ui, sans-serif";
       ctx.textAlign = "right";
       let lastLabelY = -Infinity;
@@ -167,7 +207,7 @@ export function renderGel(canvas, lanes, opts) {
 
     // uncut annotation
     if (lane.uncut) {
-      ctx.fillStyle = "rgba(255,190,110,0.75)";
+      ctx.fillStyle = ink(0.72, 0.9);
       ctx.font = "italic 10px system-ui, sans-serif";
       ctx.textAlign = "center";
       ctx.fillText("uncut", x, yFor(sizes[0].size) + 16);
@@ -177,7 +217,7 @@ export function renderGel(canvas, lanes, opts) {
   // Divider between the reference ladder and the sample lanes.
   const dividerX = 110 + laneW;
   ctx.save();
-  ctx.strokeStyle = "#2a3648";
+  ctx.strokeStyle = ink(GEL.divider);
   ctx.setLineDash([4, 4]);
   ctx.beginPath();
   ctx.moveTo(dividerX, 34);
@@ -187,7 +227,7 @@ export function renderGel(canvas, lanes, opts) {
 
   if (lanes.length === 0) {
     const cx = (dividerX + W) / 2;
-    ctx.fillStyle = "#5b6b7d";
+    ctx.fillStyle = ink(GEL.hint);
     ctx.textAlign = "center";
     ctx.font = "italic 13px system-ui, sans-serif";
     ctx.fillText("No digest lanes on this gel", cx, H / 2 - 8);
@@ -197,7 +237,7 @@ export function renderGel(canvas, lanes, opts) {
   }
 
   // electrode hints
-  ctx.fillStyle = "#5b6b7d";
+  ctx.fillStyle = ink(GEL.hint);
   ctx.font = "11px system-ui, sans-serif";
   ctx.textAlign = "left";
   ctx.fillText("− wells", 8, wellY);

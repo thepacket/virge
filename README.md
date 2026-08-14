@@ -141,9 +141,9 @@ coordinates (BsaI GGTCTC(1/5), FokI GGATG(9/13), MmeI's 2 nt 3′ overhang).
 ### Gel
 Log-linear migration calibrated to agarose percentage (0.7–2 %), with
 compressed rather than clamped migration outside the resolving range so
-oversized fragments still separate. The ladder is drawn in a distinct blue and
-framed as a size standard, and its choice (1 kb / 100 bp) sets the gel's zoom
-window. PNG export.
+oversized fragments still separate. The ladder prints dimmer than the sample
+lanes and is captioned as a size standard, and its choice (1 kb / 100 bp) sets
+the gel's zoom window. PNG export.
 
 Lanes are rendered as an **accumulated intensity profile**, not one rectangle
 per fragment. Each fragment deposits a Gaussian of stain whose mass scales with
@@ -292,10 +292,19 @@ Colours come from the `skew-t` project — near-black surfaces with a cyan accen
 `--ok`) come from the same palette, and the previously hardcoded reds, ambers and
 greens now reference them — so retheming means editing that one block.
 
-**The gel keeps its own colours deliberately.** Bands stay green, the ladder blue
-and an uncut plasmid orange, because those encode meaning — green is your digest,
-blue is the size standard, orange is uncut DNA — and recolouring them to match
-the chrome would lose more than it gained.
+**The gel is monochrome**, like a gel photographed on a gel doc — a single
+channel with nothing colour-coded. Because hue can no longer separate the lanes,
+brightness does: sample bands print at full strength and the ladder deliberately
+dimmer (which is also how a mass-adjusted ladder exposes beside a concentrated
+digest), backed up by the ladder's caption and the dashed divider so the cue is
+never carried by tone alone. An uncut plasmid keeps its italic `uncut` label
+where it used to rely on being orange.
+
+Every tone — bands, labels, wells, the slab itself — derives from one `TINT`
+constant at the top of `src/gel.js`, so the gel is provably single-hue (verified
+by checking that all 1.66M canvas pixels have identical RGB channels). Set
+`TINT` to something like `[176, 226, 255]` to tint the whole gel cool instead of
+neutral grey.
 
 ## Notes
 
