@@ -233,9 +233,8 @@ buffer choice against your supplier's chart. See [BACKLOG.md](BACKLOG.md#1-buffe
 for what it would take to finish.
 
 ### AI assistant
-A chat panel at the bottom of the left pane, backed by the Claude API
-(`claude-opus-5`). It answers questions about the loaded DNA and **operates the
-app through tools** rather than only describing what to do — it can read the
+A chat panel in the right-hand pane, backed by the Claude API. It answers
+questions about the loaded DNA and **operates the app through tools** rather than only describing what to do — it can read the
 current state, search the enzyme catalog with live cut counts, preview a digest,
 load a sequence, add lanes, and adjust the gel and imaging controls.
 
@@ -251,6 +250,16 @@ and nothing else in VIRGE is affected.
 
 There is **no server component** — the browser calls `api.anthropic.com`
 directly, so the assistant works in a static build exactly as it does in dev.
+
+**Model.** The picker in the panel header chooses between Opus 5 (default —
+most capable, best at multi-step setup), Sonnet 5 (balanced) and Haiku 4.5
+(fastest and cheapest, weaker at planning a digest). The choice persists in
+`localStorage` and you can switch mid-conversation: the history is plain
+messages and tool results that any of them can pick up, though the next turn
+pays a prompt-cache miss. It is locked while a reply is in flight, so a single
+exchange never finishes on a different model than it started on. Since you are
+spending your own credit, the tradeoff is yours to make — a "which enzymes cut
+this once?" lookup does not need Opus.
 
 **Clear** (above Send) drops the conversation the assistant remembers, so the
 next question starts from nothing — useful when you switch topic and don't want

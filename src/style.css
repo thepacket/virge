@@ -191,8 +191,11 @@ body {
 
 .card-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 10px; }
 .card-head h2 { margin: 0; }
-/* Compact purpose picker beside the Suggest button. */
-#suggest-purpose { margin-left: auto; font-size: 11px; padding: 2px 4px; min-height: 24px; }
+/* Compact pickers that sit in a card header rather than in the body. */
+#suggest-purpose, .head-select {
+  margin-left: auto; font-size: 11px; padding: 2px 4px; min-height: 24px;
+}
+.head-select:disabled { opacity: 0.45; cursor: default; }
 
 /* Collapsible left-panel sections. The header is the summary, so the whole
    strip is the hit target; buttons inside it stop propagation in main.js. */

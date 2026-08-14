@@ -23,9 +23,32 @@ import { digest } from "./digest.js";
 
 const $ = (sel) => document.querySelector(sel);
 const MAX_TOOL_ROUNDS = 8;
-const MODEL = "claude-opus-5";
 const MAX_TOKENS = 16000;
 const KEY_STORAGE = "virge-anthropic-key";
+const MODEL_STORAGE = "virge-anthropic-model";
+
+// The visitor pays for their own calls, so the choice is theirs to make rather
+// than ours to make for them. Ordered most to least capable; `effort: "medium"`
+// below is valid on all three (only `max` would fail on Haiku).
+const MODELS = [
+  { id: "claude-opus-5", label: "Opus 5",
+    note: "most capable — best at multi-step setup and awkward digests" },
+  { id: "claude-sonnet-5", label: "Sonnet 5",
+    note: "balanced — a good default for questions about the loaded DNA" },
+  { id: "claude-haiku-4-5", label: "Haiku 4.5",
+    note: "fastest and cheapest — fine for lookups, weaker at planning" },
+];
+const DEFAULT_MODEL = MODELS[0].id;
+
+function readModel() {
+  let saved = null;
+  try { saved = localStorage.getItem(MODEL_STORAGE); } catch { /* private mode */ }
+  // A stored id that is no longer offered would otherwise 404 on every turn.
+  return MODELS.some((m) => m.id === saved) ? saved : DEFAULT_MODEL;
+}
+
+let model = DEFAULT_MODEL;
+const modelLabel = (id) => MODELS.find((m) => m.id === id)?.label ?? id;
 
 // Injected by main.js so the assistant can drive the app without importing
 // its internals (which would be circular).
@@ -238,7 +261,7 @@ async function postTurn(messages) {
   if (!client) throw new Error("No API key set.");
 
   const request = {
-    model: MODEL,
+    model,
     max_tokens: MAX_TOKENS,
     // Stable prefix (system + tools) is cached; the volatile state snapshot
     // rides in the user turn, after this breakpoint.
@@ -250,9 +273,9 @@ async function postTurn(messages) {
 
   let message;
   try {
-    // Opus 5's safety classifiers can decline a request; a server-side fallback
-    // re-runs it on Anthropic's recommended model instead of surfacing the
-    // refusal. Beta — fall back to a plain call if the account can't use it.
+    // Safety classifiers can decline a request; a server-side fallback re-runs
+    // it on Anthropic's recommended model instead of surfacing the refusal.
+    // Beta — fall back to a plain call if the account or model can't use it.
     message = await client.beta.messages.create({
       ...request,
       betas: ["server-side-fallback-2026-07-01"],
@@ -271,7 +294,7 @@ function describeError(err) {
     return "That API key was rejected. Check it, or paste a different one.";
   }
   if (err instanceof Anthropic.PermissionDeniedError) {
-    return "This key doesn't have access to " + MODEL + ".";
+    return `This key doesn't have access to ${modelLabel(model)} (${model}). Try another model.`;
   }
   if (err instanceof Anthropic.RateLimitError) {
     return "Rate limited by the API — wait a moment and retry.";
@@ -372,11 +395,42 @@ async function sendMessage(text) {
 function setInputEnabled(on) {
   $("#chat-input").disabled = !on;
   $("#chat-send").disabled = !on;
+  // Locked mid-turn: postTurn reads the model per request, so switching between
+  // tool rounds would finish someone else's reasoning on a different model.
+  $("#chat-model").disabled = busy;
   updateClearState();
+}
+
+/** Fill the model picker and keep `model` in step with it. Switching mid-thread
+ *  is allowed: the conversation is plain messages and tool results, which any
+ *  of these models can pick up. It does void the prompt cache on the next turn,
+ *  which costs a little but nothing correctness-wise. */
+function initModelPicker() {
+  const select = $("#chat-model");
+  for (const m of MODELS) {
+    const opt = document.createElement("option");
+    opt.value = m.id;
+    opt.textContent = m.label;
+    opt.title = m.note;
+    select.append(opt);
+  }
+
+  model = readModel();
+  select.value = model;
+
+  select.addEventListener("change", () => {
+    model = select.value;
+    try { localStorage.setItem(MODEL_STORAGE, model); } catch { /* private mode */ }
+    // Only worth saying inside a live conversation — on an empty log it would
+    // be noise about a setting the user just watched themselves change.
+    if (history.length > 0) toolNote(`switched to ${modelLabel(model)}`);
+  });
 }
 
 // ---------- wiring ----------
 export function initAssistant() {
+  initModelPicker();
+
   // Key entry. The value is the user's own credential: it goes to
   // localStorage and to api.anthropic.com, nowhere else.
   $("#chat-key-form").addEventListener("submit", (e) => {
