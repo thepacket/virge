@@ -292,6 +292,12 @@ Colours come from the `skew-t` project — near-black surfaces with a cyan accen
 `--ok`) come from the same palette, and the previously hardcoded reds, ambers and
 greens now reference them — so retheming means editing that one block.
 
+Buttons are neutral light grey (`--btn-text` and friends) rather than accented,
+which leaves cyan to mean *this is data* — cut counts, fragment sizes, the active
+sequence — instead of competing with every control on the page. The two button
+states that carry meaning keep their colour: disabled greys out, and the armed
+half of a two-click delete turns red.
+
 **The gel is monochrome**, like a gel photographed on a gel doc — a single
 channel with nothing colour-coded. Because hue can no longer separate the lanes,
 brightness does: sample bands print at full strength and the ladder deliberately

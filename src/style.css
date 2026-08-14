@@ -22,6 +22,12 @@
   --warn: #ffb454;
   --error: #ff6b7d;
   --ok: #57d9a3;
+  /* Buttons are neutral light grey rather than accented, so the cyan is left to
+     mean "this is data" (counts, fragment sizes, the active sequence). */
+  --btn-text: #d3d8de;
+  --btn-line: #5b6470;
+  --btn-fill: rgba(211, 216, 222, 0.10);
+  --btn-fill-hover: rgba(211, 216, 222, 0.20);
   --scroll-thumb: #2b3444;
   --scroll-thumb-hover: #3b4759;
 }
@@ -152,12 +158,12 @@ textarea { width: 100%; padding: 8px; resize: vertical; font-family: ui-monospac
   font-size: 12px;
   min-height: 24px;      /* one button height throughout */
   cursor: pointer;
-  background: var(--accent-dim);
-  border-color: var(--accent);
-  color: var(--accent);
+  background: var(--btn-fill);
+  border-color: var(--btn-line);
+  color: var(--btn-text);
   font-weight: 600;
 }
-.btn:hover:not(:disabled) { background: var(--accent-fill); }
+.btn:hover:not(:disabled) { background: var(--btn-fill-hover); border-color: var(--btn-text); }
 /* `small` is now layout-only: it right-aligns a button in a flex header. */
 .btn.small { margin-left: auto; }
 .btn:disabled { opacity: 0.4; cursor: default; border-color: var(--border); color: var(--muted); background: transparent; }
