@@ -36,6 +36,12 @@ function loadDna(name, seq, circular, key = null, features = []) {
   state.seq = seq;
   state.circular = circular;
   state.features = features;
+  // Any import status describes how the *previous* sequence arrived, so it is
+  // stale the moment this one loads. Left standing it sat directly under the
+  // new sequence's own line, naming a different molecule — the two together
+  // read as a question about which one is actually loaded. Callers that have
+  // something to add set it again after this returns.
+  setImportStatus("");
   renderAll();
 }
 
@@ -88,14 +94,14 @@ function acceptRecords(records, origin) {
     features: rec.features || [],
     topology: circular ? "circular" : "linear",
   });
-  const stats = sequenceStats(rec.sequence);
   loadDna(stored, rec.sequence, circular, `user:${stored}`, rec.features || []);
-  setImportStatus(
-    `Loaded ${stats.length.toLocaleString()} bp · ${stats.gc.toFixed(1)}% GC` +
-    (rec.features?.length ? ` · ${rec.features.length} features` : " · no annotations") +
-    (stats.ambiguous ? ` · ${stats.ambiguous} ambiguous bases` : "") +
-    (usable.length > 1 ? ` — first of ${usable.length} records; the rest are saved too.` : "")
-  );
+  // Length, GC, features and ambiguous bases are all on the sequence's own line
+  // above, so repeating them here only invited the reader to check whether the
+  // two agreed. Say only what that line cannot: that a multi-record file had
+  // more in it than the one now loaded.
+  if (usable.length > 1) {
+    setImportStatus(`First of ${usable.length} records — the rest are in Your sequences.`);
+  }
   // Multi-record files: keep the others so they show up in Saved sequences.
   for (const extra of usable.slice(1)) {
     saveUserSeq({
@@ -150,9 +156,9 @@ async function loadLazySample(key, s) {
       throw new Error(`expected ${s.length.toLocaleString()} bp but received ${rec.sequence.length.toLocaleString()}`);
     }
     lazyCache.set(key, { sequence: rec.sequence, features: rec.features || [] });
+    // No receipt: loadDna clears the "Fetching…" line, and the sequence's own
+    // line now reads the same name, length and feature count this used to.
     loadDna(s.name, rec.sequence, s.topology === "circular", key, rec.features || []);
-    setImportStatus(`Loaded ${s.name} · ${rec.sequence.length.toLocaleString()} bp` +
-      (rec.features?.length ? ` · ${rec.features.length} features` : ""));
   } catch (err) {
     setImportStatus(`Could not fetch ${s.name}: ${err.message}`, true);
   } finally {

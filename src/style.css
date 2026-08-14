@@ -340,7 +340,10 @@ label.inline { flex-direction: row; align-items: center; gap: 5px; color: var(--
   background: var(--input); border: 1px solid var(--border);
   border-radius: 7px; color: var(--text);
 }
-#import-status { margin-top: 6px; color: var(--accent); }
+/* Muted, not accent: this is progress and asides ("Fetching…", "first of 3
+   records"), and in accent it outranked the sequence's own line above it.
+   Errors below still get colour, because those do want attention. */
+#import-status { margin-top: 6px; color: var(--muted); }
 #import-status:empty { margin: 0; }
 #import-status.error { color: var(--error); }
 
