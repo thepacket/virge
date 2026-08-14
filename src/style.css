@@ -353,10 +353,12 @@ details summary { cursor: pointer; color: var(--muted); font-size: 13px; margin-
 .lane-head { display: flex; gap: 10px; align-items: center; }
 .lane-num { color: var(--muted); font-size: 12px; }
 .frags { margin-top: 4px; }
+/* Fragment sizes in bp — light grey, matching the buttons, so the numbers read
+   as plain readout rather than something highlighted. */
 .frag {
   display: inline-block;
-  background: var(--accent-dim);
-  color: var(--accent);
+  background: var(--btn-fill);
+  color: var(--btn-text);
   border-radius: 5px;
   padding: 1px 7px;
   margin: 2px 2px 0 0;
