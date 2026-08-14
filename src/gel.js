@@ -48,6 +48,20 @@ const GEL = {
   ladderBand: 0.62,         // dimmer, so the reference reads as reference
 };
 
+// Horizontal geometry, in CSS pixels.
+//
+// The slab runs the full width of the canvas — there is no backdrop margin at
+// the left or right edge. It used to inset by 56px to hold the "− wells" and
+// "+" electrode marks; those are gone, so nothing needs the space.
+//
+// LANE_LEFT is not margin, it is clearance: the ladder's bp labels are drawn
+// right-aligned off the left edge of its band, so the first lane centre has to
+// sit far enough in that the widest label ("1.5 kb") still starts on canvas.
+// LANE_RIGHT is the matching clearance for the last lane's caption, which is
+// centred on the lane and would otherwise overhang.
+const LANE_LEFT = 70;
+const LANE_RIGHT = 40;
+
 export function renderGel(canvas, lanes, opts) {
   const { gelPct = 1, ladderKey = "1kb", exposure = 1, contrast = 0.5 } = opts;
   // The agarose % sets the physical resolving limits; the chosen ladder frames
@@ -74,10 +88,10 @@ export function renderGel(canvas, lanes, opts) {
   ctx.fillStyle = bg;
   ctx.fillRect(0, 0, W, H);
   ctx.fillStyle = ink(GEL.slab);
-  ctx.fillRect(56, 8, W - 64, H - 16);
+  ctx.fillRect(0, 8, W, H - 16);
 
   const allLanes = [{ ladder: true, label: LADDERS[ladderKey].label }, ...lanes];
-  const laneW = (W - 150) / Math.max(allLanes.length, 5);
+  const laneW = (W - LANE_LEFT - LANE_RIGHT) / Math.max(allLanes.length, 5);
   const bandWidth = Math.min(laneW * 0.56, 120);
   const wellY = 40, trackTop = 58, trackBottom = H - 36;
 
@@ -93,7 +107,7 @@ export function renderGel(canvas, lanes, opts) {
   };
 
   allLanes.forEach((lane, i) => {
-    const x = 110 + (i + 0.5) * laneW;
+    const x = LANE_LEFT + (i + 0.5) * laneW;
 
     // well
     ctx.fillStyle = ink(GEL.well);
@@ -215,7 +229,7 @@ export function renderGel(canvas, lanes, opts) {
   });
 
   // Divider between the reference ladder and the sample lanes.
-  const dividerX = 110 + laneW;
+  const dividerX = LANE_LEFT + laneW;
   ctx.save();
   ctx.strokeStyle = ink(GEL.divider);
   ctx.setLineDash([4, 4]);
