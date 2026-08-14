@@ -53,13 +53,6 @@ widths, but the three-column layout made it reachable on a laptop rather than
 only on a phone. Collapsing either pane clears it. Fix is in `gel.js`: stagger,
 rotate, or abbreviate captions once `laneW` drops below the text width.
 
-## 2d. One 710 kB bundle
-
-The build emits a single chunk, 186 kB gzipped, most of it the enzyme table and
-the bundled sample sequences — both of which grow with every addition. Served
-once per cold visit and cached for a year, so it is not urgent, but the obvious
-fix when it matters is a dynamic import of `src/data/samples.js`.
-
 ## 3. Partial digest simulation
 
 Model incomplete digestion — a fixed cut probability per site, producing the
