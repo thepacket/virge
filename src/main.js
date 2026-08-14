@@ -428,11 +428,30 @@ $("#clear-lanes").addEventListener("click", () => {
 
 $("#suggest-digests").addEventListener("click", () => {
   const existing = state.lanes.map((l) => [...l.enzymeNames].sort().join("+"));
-  const picks = suggestDigests(state.seq, state.circular, { count: 3, existing, methylation: state.methylation });
-  if (picks.length === 0) return;
+  const picks = suggestDigests(state.seq, state.circular, {
+    count: 3,
+    existing,
+    methylation: state.methylation,
+    features: state.features,          // so it won't propose cutting through genes
+    purpose: $("#suggest-purpose").value,
+  });
+  // The purpose filters are strict enough to legitimately find nothing — a
+  // small plasmid may have no clean cloning option at all. Say so rather than
+  // leaving the button looking broken.
+  if (picks.length === 0) {
+    const label = $("#suggest-purpose").selectedOptions[0].textContent.replace(/^for /, "");
+    $("#suggest-note").textContent =
+      `Nothing suitable for ${label} on this DNA under the current methylation setting — ` +
+      `try another purpose, or widen the enzyme tier.`;
+    $("#suggest-note").hidden = false;
+    return;
+  }
+  $("#suggest-note").hidden = true;
   for (const names of picks) state.lanes.push({ enzymeNames: names });
   renderAll();
 });
+
+$("#suggest-purpose").addEventListener("change", () => { $("#suggest-note").hidden = true; });
 
 // ---------- Configuration library (localStorage) ----------
 const LIB_KEY = "virge-library";

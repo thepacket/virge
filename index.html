@@ -59,7 +59,12 @@
       <details class="card section" id="sec-enzymes" open>
         <summary class="card-head">
           <h2>2 · Restriction Enzymes</h2>
-          <button id="suggest-digests" class="btn primary small" title="Add lanes with digests that give a nice band pattern for this DNA">✨ Suggest</button>
+          <select id="suggest-purpose" title="What the suggestions should optimise for">
+            <option value="diagnostic" selected>for diagnosis</option>
+            <option value="cloning">for cloning</option>
+            <option value="fingerprint">for fingerprinting</option>
+          </select>
+          <button id="suggest-digests" class="btn small" title="Add lanes with digests suited to the selected purpose">✨ Suggest</button>
         </summary>
         <div class="row filter-row">
           <input type="search" id="enzyme-search" placeholder="Search name or alias (e.g. Esp3I)…" />
@@ -74,6 +79,7 @@
             <option value="unique">Unique (1×)</option>
           </select>
         </div>
+        <div id="suggest-note" class="warning" hidden></div>
         <div id="enzyme-count" class="hint"></div>
         <div id="enzyme-list" class="enzyme-grid"></div>
         <div class="row">

@@ -113,6 +113,30 @@ how often an enzyme cuts the loaded DNA:
 An enzyme you have already ticked stays visible under every filter, so a
 selection can't silently disappear.
 
+### Suggested digests
+✨ **Suggest** proposes digests for a stated **purpose**, picked with the
+selector beside it:
+
+| Purpose | Aims for | Cares about |
+| --- | --- | --- |
+| Diagnosis | ~5 well-separated bands | resolvable, readable, mostly gene-sparing |
+| Cloning | ~2 bands | **not cutting inside annotated genes**, common enzymes |
+| Fingerprinting | ~12 bands | resolution and spread; gene-cutting irrelevant |
+
+It rejects pairs that can't share a tube (the same temperature check the manual
+lane warning uses), collapses isoschizomers and no-op pairs by comparing the cuts
+they actually produce rather than enzyme names, and returns fewer than three
+options rather than padding the list with a bad one. On pBR322 the cloning
+setting proposes NdeI + PciI, EcoRI + SspI and ClaI + SspI — none of which touch
+`bla` or `tet`.
+
+This replaced a version that scored band spread alone, and an audit showed why
+that was a toy: **every** suggestion on annotated DNA cut through a gene, one
+proposed an un-performable enzyme pair, every result sat pinned at 13–14 bands
+because an unbounded band-count reward swamped the band-count penalty, and
+isoschizomers were offered as if they were different experiments. Those
+properties are now pinned by tests.
+
 ### Methylation
 Digests are computed in a methylation context, because a plasmid from a
 standard miniprep is *not* naked DNA:

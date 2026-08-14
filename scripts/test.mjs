@@ -1,8 +1,9 @@
 // Regression tests — run with: npm test
 // Expected values are published restriction maps, not outputs of this code.
 import { SAMPLES } from "../src/data/samples.js";
-import { lookup, ENZYMES, overhangSignature, compatibleEnds } from "../src/enzymes.js";
+import { lookup, ENZYMES, overhangSignature, compatibleEnds, bufferWarning } from "../src/enzymes.js";
 import { digest, findSites } from "../src/digest.js";
+import { suggestDigests } from "../src/suggest.js";
 import { parseAny, sequenceStats, ParseError } from "../src/genbank.js";
 
 let pass = 0, fail = 0;
@@ -131,6 +132,64 @@ check("circular plasmids corrected",
 check("linear genomes stay linear",
   ["lambda", "T7", "T4", "yeastChrI", "HSV1"].map((k) => SAMPLES[k].topology),
   ["linear", "linear", "linear", "linear", "linear"]);
+
+// --- Suggestions ------------------------------------------------------------
+// These pin the properties that made the first version toy-like: it ignored
+// annotations, proposed digests that can't share a tube, offered isoschizomers
+// as distinct options, and pinned every result to the top of its band range.
+const PROTECTED = new Set(["CDS", "gene", "rep_origin"]);
+const suggestFor = (key, purpose) => {
+  const s = SAMPLES[key];
+  return suggestDigests(s.sequence, s.topology === "circular", {
+    count: 3, methylation: "dam_dcm", features: s.features || [], purpose,
+  });
+};
+const digestOf = (key, names) => {
+  const s = SAMPLES[key];
+  return digest(s.sequence, names.map(lookup), s.topology === "circular", { methylation: "dam_dcm" });
+};
+
+// Never propose an experiment the app's own check says can't be run in one tube.
+const allPicks = ["pUC19", "pBR322", "pEGFP_N1", "lambda", "T7", "phiX174", "SV40"]
+  .flatMap((k) => ["diagnostic", "cloning", "fingerprint"].map((p) => suggestFor(k, p)))
+  .flat();
+check("no suggestion has a temperature clash",
+  allPicks.filter((names) => bufferWarning(names.map(lookup))).length, 0);
+
+// Band count must track the purpose, not sit at the top of the allowed range.
+const bandsFor = (purpose) => ["pUC19", "pBR322", "pEGFP_N1", "SV40"]
+  .flatMap((k) => suggestFor(k, purpose).map((n) => digestOf(k, n).fragments.length));
+const mean = (a) => a.reduce((x, y) => x + y, 0) / a.length;
+check("cloning aims at ~2 bands", mean(bandsFor("cloning")) < 3.5, true);
+check("diagnostic aims at ~5 bands",
+  (() => { const m = mean(bandsFor("diagnostic")); return m > 3 && m < 8; })(), true);
+check("fingerprint aims high", mean(bandsFor("fingerprint")) > 7, true);
+
+// Cloning must prefer cuts that spare annotated genes where that's possible.
+const cloningCutsInGenes = (key) => {
+  const s = SAMPLES[key];
+  const genes = (s.features || []).filter((f) => PROTECTED.has(f.type));
+  return suggestFor(key, "cloning").flatMap((names) =>
+    digestOf(key, names).cuts.filter((c) =>
+      genes.some((g) => g.segments.some((sg) => c >= sg.start && c < sg.end))));
+};
+check("cloning spares genes on pBR322", cloningCutsInGenes("pBR322").length, 0);
+check("cloning spares genes on pEGFP-N1", cloningCutsInGenes("pEGFP_N1").length, 0);
+
+// Isoschizomers cut identically, so they must not appear as separate options.
+const sigOf = (key, names) => digestOf(key, names).cuts.join(",");
+for (const purpose of ["diagnostic", "fingerprint"]) {
+  const sigs = suggestFor("pUC19", purpose).map((n) => sigOf("pUC19", n));
+  check(`no duplicate digests among ${purpose} picks`, sigs.length, new Set(sigs).size);
+}
+
+// No enzyme should anchor every suggestion.
+const reuse = (key, purpose) => {
+  const counts = {};
+  suggestFor(key, purpose).flat().forEach((n) => (counts[n] = (counts[n] || 0) + 1));
+  return Math.max(0, ...Object.values(counts));
+};
+check("no enzyme appears in all three picks", reuse("pUC19", "cloning") <= 2, true);
 
 // --- Catalog integrity ------------------------------------------------------
 check("every enzyme has cut coordinates",
