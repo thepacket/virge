@@ -151,8 +151,31 @@ export const TOOLS = [
     input_schema: {
       type: "object",
       properties: {
-        agarose: { type: "number", enum: [0.7, 1, 1.5, 2], description: "Agarose percentage." },
-        ladder: { type: "string", enum: ["1kb", "100bp"], description: "Size standard; also sets the gel's zoom window." },
+        agarose: { type: "number", enum: [0.7, 1, 1.5, 2], description: "Agarose percentage (constant field only)." },
+        field: {
+          type: "string",
+          enum: ["agarose", "pfge"],
+          description:
+            "'agarose' is a normal constant-field gel, resolving up to ~20 kb. 'pfge' is a pulsed-field " +
+            "(CHEF) gel, resolving 10 kb to ~2.5 Mb — use it when fragments are tens of kb or larger, " +
+            "which is what rare cutters on a genome produce.",
+        },
+        pfge_run: {
+          type: "string",
+          enum: ["short", "medium", "long"],
+          description:
+            "Pulsed-field switch-time programme, setting the resolving window: 'short' 1-6 s (10-150 kb), " +
+            "'medium' 10-60 s (0.1-1 Mb), 'long' 60-120 s (0.2-2.5 Mb). Pick the one whose window " +
+            "contains the fragments.",
+        },
+        ladder: {
+          type: "string",
+          enum: ["1kb", "100bp", "lambda-pfg", "yeast-chr"],
+          description:
+            "Size standard; also sets the gel's zoom window. '1kb' and '100bp' are constant-field; " +
+            "'lambda-pfg' (48.5 kb to 1 Mb) and 'yeast-chr' (230 kb to 1.5 Mb) are pulsed-field and " +
+            "switch the gel to PFGE on their own.",
+        },
         methylation: {
           type: "string",
           enum: ["none", "dam_dcm", "cpg"],

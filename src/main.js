@@ -3,7 +3,7 @@ import { ENZYMES, lookup, endType, siteWithCut, bufferWarning,
          overhangSignature, compatibleEnds } from "./enzymes.js";
 import { digest, findCuts } from "./digest.js";
 import { suggestDigests } from "./suggest.js";
-import { renderGel } from "./gel.js";
+import { renderGel, LADDERS, PFGE_RUNS, laddersFor } from "./gel.js";
 import { parseAny, sequenceStats, featuresInRange } from "./genbank.js";
 import { initAssistant, registerAssistantApp } from "./assistant.js";
 
@@ -17,7 +17,9 @@ const state = {
   features: [],     // annotations from a GenBank record, when available
   lanes: [],        // [{ enzymeNames: [...] }]
   selected: new Set(), // enzyme names ticked but not yet added as a lane
+  gelMode: "agarose", // "agarose" (constant field) | "pfge" (CHEF)
   gelPct: 1,
+  pfgeRun: "medium",
   ladderKey: "1kb",
   exposure: 1,      // gel-doc style exposure multiplier
   contrast: 0.5,    // gamma of the intensity transfer curve
@@ -485,7 +487,9 @@ function currentConfig() {
   const cfg = {
     savedAt: new Date().toISOString(),
     lanes: state.lanes.map((l) => ({ enzymeNames: [...l.enzymeNames] })),
+    gelMode: state.gelMode,
     gelPct: state.gelPct,
+    pfgeRun: state.pfgeRun,
     ladderKey: state.ladderKey,
     exposure: state.exposure,
     contrast: state.contrast,
@@ -504,10 +508,15 @@ function currentConfig() {
 function applyConfig(cfg) {
   state.lanes = (cfg.lanes || []).map((l) => ({ enzymeNames: [...l.enzymeNames] }));
   state.gelPct = cfg.gelPct || 1;
-  state.ladderKey = LADDERS_KEYS.includes(cfg.ladderKey) ? cfg.ladderKey : "1kb";
+  // Configurations saved before pulsed-field existed have no gelMode; they were
+  // all constant-field, so the default is the correct reading of their absence.
+  state.gelMode = cfg.gelMode === "pfge" ? "pfge" : "agarose";
+  state.pfgeRun = PFGE_RUNS[cfg.pfgeRun] ? cfg.pfgeRun : "medium";
+  // A ladder is only valid in its own mode, and a config could name one from
+  // the other; renderGelMode() re-derives it against the restored mode.
+  state.ladderKey = LADDERS[cfg.ladderKey] ? cfg.ladderKey : "1kb";
   state.methylation = ["none", "dam_dcm", "cpg"].includes(cfg.methylation) ? cfg.methylation : "dam_dcm";
-  $("#gel-pct").value = String(state.gelPct);
-  $("#ladder-select").value = state.ladderKey;
+  renderGelMode();
   $("#methylation").value = state.methylation;
   const exp = Number(cfg.exposure);
   setExposure(exp > 0 ? Math.log2(exp) : 0, { redraw: false });
@@ -524,7 +533,7 @@ function applyConfig(cfg) {
   }
 }
 
-const LADDERS_KEYS = ["1kb", "100bp"];
+
 
 function renderLibrary() {
   const lib = readLibrary();
@@ -544,7 +553,7 @@ function renderLibrary() {
         <div class="config-row">
           <button class="config-load" data-name="${encodeURIComponent(n)}" title="Load this configuration">
             <span class="config-name">${n}</span>
-            <span class="hint">${dnaLabel} · ${(cfg.lanes || []).length} lane${(cfg.lanes || []).length === 1 ? "" : "s"} · ${cfg.gelPct} %</span>
+            <span class="hint">${dnaLabel} · ${(cfg.lanes || []).length} lane${(cfg.lanes || []).length === 1 ? "" : "s"} · ${cfg.gelMode === "pfge" ? "PFGE" : `${cfg.gelPct} %`}</span>
           </button>
           <button class="btn ghost small config-del" data-name="${encodeURIComponent(n)}" title="Delete">✕</button>
         </div>`;
@@ -637,6 +646,38 @@ $("#import-file").addEventListener("change", async (e) => {
 });
 
 // ---------- Gel + results ----------
+
+/** The two field modes have disjoint ladders — a 1 kb ladder is meaningless on
+ *  a pulsed-field gel and λ concatemers are meaningless on a constant-field one
+ *  — so the ladder list is rebuilt whenever the mode changes, keeping the
+ *  current choice if it is still valid and falling back to the first if not. */
+function renderLadderOptions() {
+  const options = laddersFor(state.gelMode);
+  if (!options.some(([k]) => k === state.ladderKey)) state.ladderKey = options[0][0];
+  $("#ladder-select").innerHTML = options
+    .map(([k, label]) => `<option value="${k}">${escapeHtml(label)}</option>`).join("");
+  $("#ladder-select").value = state.ladderKey;
+}
+
+function renderGelMode() {
+  const pfge = state.gelMode === "pfge";
+  $("#gel-mode").value = state.gelMode;
+  $("#gel-pct-label").hidden = pfge;
+  $("#pfge-run-label").hidden = !pfge;
+  $("#gel-pct").value = String(state.gelPct);
+  $("#pfge-run").value = state.pfgeRun;
+  renderLadderOptions();
+}
+
+$("#pfge-run").innerHTML = Object.entries(PFGE_RUNS)
+  .map(([k, r]) => `<option value="${k}">${escapeHtml(r.label)}</option>`).join("");
+
+$("#gel-mode").addEventListener("change", (e) => {
+  state.gelMode = e.target.value;
+  renderGelMode();
+  renderAll();
+});
+$("#pfge-run").addEventListener("change", (e) => { state.pfgeRun = e.target.value; renderAll(); });
 $("#gel-pct").addEventListener("change", (e) => { state.gelPct = parseFloat(e.target.value); renderAll(); });
 $("#ladder-select").addEventListener("change", (e) => { state.ladderKey = e.target.value; renderAll(); });
 
@@ -789,7 +830,9 @@ let lastLanes = [];
 
 function renderGelOnly() {
   renderGel($("#gel-canvas"), lastLanes, {
+    gelMode: state.gelMode,
     gelPct: state.gelPct,
+    pfgeRun: state.pfgeRun,
     ladderKey: state.ladderKey,
     exposure: state.exposure,
     contrast: state.contrast,
@@ -928,8 +971,22 @@ registerAssistantApp({
 
   setGel: (opts) => {
     const applied = {};
-    if (opts.agarose != null) { state.gelPct = opts.agarose; $("#gel-pct").value = String(opts.agarose); applied.agarose = opts.agarose; }
-    if (opts.ladder) { state.ladderKey = opts.ladder; $("#ladder-select").value = opts.ladder; applied.ladder = opts.ladder; }
+    if (opts.agarose != null) { state.gelPct = opts.agarose; applied.agarose = opts.agarose; }
+    // Mode before ladder: renderGelMode() re-derives the ladder against the new
+    // mode, so setting the ladder first would have it overwritten.
+    if (opts.field === "pfge" || opts.field === "agarose") {
+      state.gelMode = opts.field; applied.field = opts.field;
+    }
+    if (opts.pfge_run && PFGE_RUNS[opts.pfge_run]) { state.pfgeRun = opts.pfge_run; applied.pfge_run = opts.pfge_run; }
+    if (opts.ladder && LADDERS[opts.ladder]) {
+      // A ladder implies its mode — asking for yeast chromosomes on a constant
+      // field is a request for a pulsed-field gel, not an error.
+      state.gelMode = LADDERS[opts.ladder].mode || "agarose";
+      state.ladderKey = opts.ladder;
+      applied.ladder = opts.ladder;
+      applied.field = state.gelMode;
+    }
+    renderGelMode();
     if (opts.methylation) { state.methylation = opts.methylation; $("#methylation").value = opts.methylation; applied.methylation = opts.methylation; }
     if (opts.exposure_stops != null) { setExposure(Math.max(-2, Math.min(2.5, opts.exposure_stops)), { redraw: false }); applied.exposure_stops = opts.exposure_stops; }
     if (opts.contrast != null) { setContrast(Math.max(0.25, Math.min(1.6, opts.contrast)), { redraw: false }); applied.contrast = opts.contrast; }
@@ -942,6 +999,7 @@ setExposure(0, { redraw: false });
 setContrast(0.5, { redraw: false });
 initSections();
 initPanes();
+renderGelMode();   // ladder options are built from the mode, not hardcoded in HTML
 initAssistant();
 initSamples();
 renderLibrary();

@@ -5,6 +5,7 @@ import { lookup, ENZYMES, overhangSignature, compatibleEnds, bufferWarning } fro
 import { digest, findSites } from "../src/digest.js";
 import { suggestDigests } from "../src/suggest.js";
 import { parseAny, sequenceStats, ParseError } from "../src/genbank.js";
+import { LADDERS, PFGE_RUNS, laddersFor, sizeLabel, sizeWindow } from "../src/gel.js";
 
 let pass = 0, fail = 0;
 const check = (label, got, want) => {
@@ -196,6 +197,67 @@ check("every enzyme has cut coordinates",
   ENZYMES.every((e) => Number.isInteger(e.cutTop) && Number.isInteger(e.cutBottom)), true);
 check("every enzyme has a valid site",
   ENZYMES.every((e) => /^[ACGTRYSWKMBDHVN]+$/.test(e.site)), true);
+
+// --- Pulsed-field mode ------------------------------------------------------
+// The λ PFG marker is a concatemer series, so every rung must be an exact
+// multiple of the λ genome — the one ladder whose values need no outside source.
+const LAMBDA = 48502;
+check("λ genome length matches the bundled sample", SAMPLES.lambda.sequence.length, LAMBDA);
+check("λ PFG rungs are all λ multiples",
+  LADDERS["lambda-pfg"].sizes.every((s) => s % LAMBDA === 0), true);
+check("λ PFG ladder tops out at 21 concatemers", Math.max(...LADDERS["lambda-pfg"].sizes), 21 * LAMBDA);
+
+// The yeast ladder and the bundled yeast sample come from different places (a
+// hand-entered reference table and an NCBI fetch). They must still agree.
+check("yeast ladder chromosome I matches the bundled sample",
+  Math.min(...LADDERS["yeast-chr"].sizes), SAMPLES.yeastChrI.length);
+check("yeast ladder has 16 chromosomes", LADDERS["yeast-chr"].sizes.length, 16);
+
+// Ladders partition cleanly by mode: a 1 kb ladder on a pulsed-field gel is
+// meaningless, and the UI rebuilds the list from this.
+const agaroseKeys = laddersFor("agarose").map(([k]) => k);
+const pfgeKeys = laddersFor("pfge").map(([k]) => k);
+check("every ladder belongs to exactly one mode",
+  agaroseKeys.length + pfgeKeys.length, Object.keys(LADDERS).length);
+check("no ladder is in both modes", agaroseKeys.some((k) => pfgeKeys.includes(k)), false);
+check("both modes offer at least one ladder", agaroseKeys.length > 0 && pfgeKeys.length > 0, true);
+
+// Each PFGE programme must resolve upward from the last, and together they must
+// cover both pulsed-field ladders — otherwise a ladder exists that no run shows.
+const runs = Object.values(PFGE_RUNS);
+check("PFGE windows ascend",
+  runs.every((r, i) => i === 0 || r.range[0] >= runs[i - 1].range[0]), true);
+check("PFGE windows are non-empty", runs.every((r) => r.range[1] > r.range[0]), true);
+const widest = [Math.min(...runs.map((r) => r.range[0])), Math.max(...runs.map((r) => r.range[1]))];
+for (const key of pfgeKeys) {
+  const s = LADDERS[key].sizes;
+  check(`${key} fits inside some PFGE window`,
+    Math.min(...s) >= widest[0] && Math.max(...s) <= widest[1], true);
+}
+
+// The size window must never invert. The 1-6 s programme (10-150 kb) and the
+// yeast ladder (230 kb up) do not overlap at all, and that pairing is reachable
+// from the UI; unguarded it produced a negative axis span and stacked every
+// band on the bottom edge with no error.
+for (const [runKey, run] of Object.entries(PFGE_RUNS)) {
+  for (const ladderKey of pfgeKeys) {
+    const [lo, hi] = sizeWindow(run.range[0], run.range[1], LADDERS[ladderKey].sizes);
+    check(`window stays positive: ${runKey} + ${ladderKey}`, lo < hi, true);
+  }
+}
+const noOverlap = sizeWindow(...PFGE_RUNS.short.range, LADDERS["yeast-chr"].sizes);
+check("a non-overlapping programme falls back to the ladder's own span",
+  noOverlap[0] < Math.min(...LADDERS["yeast-chr"].sizes) &&
+  noOverlap[1] > Math.max(...LADDERS["yeast-chr"].sizes), true);
+
+// sizeLabel had a bug that turned "10 Mb" into "1 Mb" by stripping a trailing
+// zero from an integer, so the megabase branch is pinned in both forms.
+check("sizeLabel bp", sizeLabel(250), "250 bp");
+check("sizeLabel kb", sizeLabel(48502), "48.5 kb");
+check("sizeLabel whole kb", sizeLabel(10000), "10 kb");
+check("sizeLabel Mb", sizeLabel(1531933), "1.53 Mb");
+check("sizeLabel whole Mb", sizeLabel(2000000), "2 Mb");
+check("sizeLabel ten Mb keeps both digits", sizeLabel(10000000), "10 Mb");
 
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

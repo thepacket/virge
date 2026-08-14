@@ -1,14 +1,79 @@
-// Virtual agarose gel renderer (canvas).
-// Migration distance is modeled as linear in log10(bp) between the resolving
-// range of the chosen agarose percentage; bands clamp (compress) outside it.
+// Virtual gel renderer (canvas), covering two electrophoresis regimes.
+//
+// Constant-field agarose: migration is linear in log10(bp) across the resolving
+// range of the chosen agarose percentage, which is why it runs out above ~20 kb
+// — every larger fragment reaches the same limiting mobility and piles into one
+// band at the top.
+//
+// Pulsed-field (CHEF): the field periodically changes direction, so a molecule
+// has to reorient before it can move again, and the time that takes scales with
+// its length. Above the constant-field limit that restores size dependence, out
+// to megabases. Two consequences are modelled here: the resolving window is set
+// by the switch time rather than the agarose percentage, and inside that window
+// migration is roughly linear in *size* rather than in log(size) — which is the
+// property that makes a ramped-pulse gel readable, and why the ladder spacing
+// looks so different between the two modes.
+//
+// Neither is a physical simulation. Both are resolving-window models: the
+// window comes from published protocol ranges, and behaviour outside it is the
+// same compression used everywhere else in this file.
 
 export const LADDERS = {
   "1kb":   { label: "1 kb ladder",   sizes: [10000, 8000, 6000, 5000, 4000, 3000, 2500, 2000, 1500, 1000, 750, 500, 250] },
   "100bp": { label: "100 bp ladder", sizes: [1500, 1200, 1000, 900, 800, 700, 600, 500, 400, 300, 200, 100] },
+
+  // λ cI857 Sam7 is 48,502 bp; the PFG marker is a concatemer series of it, so
+  // every rung is an exact multiple and the sizes need no external source.
+  "lambda-pfg": {
+    label: "λ ladder (PFG)", mode: "pfge",
+    sizes: Array.from({ length: 21 }, (_, i) => 48502 * (21 - i)),
+  },
+  // S. cerevisiae S288C reference chromosome lengths. Chromosome I here is
+  // 230,218 bp — the same number as the bundled Yeast chromosome I sample, so
+  // the ladder and the sample agree by construction rather than by luck.
+  //
+  // Caveat worth knowing at the bench: chromosome XII runs at ~2.2 Mb on a real
+  // gel, not the 1,078 kb below. The assembly collapses its ~150-copy rDNA
+  // array; the physical molecule keeps it. The assembly value is used because
+  // it is the one that is verifiable.
+  "yeast-chr": {
+    label: "S. cerevisiae chromosomes", mode: "pfge",
+    sizes: [1531933, 1091291, 1090940, 1078177, 948066, 924431, 813184, 784333,
+            745751, 666816, 576874, 562643, 439888, 316620, 270161, 230218],
+  },
 };
 
 // Resolving range [min bp, max bp] by agarose %
 const RANGES = { 0.7: [500, 20000], 1: [250, 12000], 1.5: [120, 5000], 2: [80, 3000] };
+
+// Pulsed-field programmes. The switch time is what an operator actually dials
+// in; the range is the window that programme resolves. Representative CHEF
+// conditions (1% agarose, 0.5x TBE, 6 V/cm, 120 degrees, 14 C) — the run times
+// are there because a PFGE run is a day of the week, not an afternoon, and that
+// is a real part of choosing this technique.
+export const PFGE_RUNS = {
+  short:  { label: "1–6 s · 10–150 kb",   switchTime: "1–6 s",   hours: 20, range: [10000, 150000] },
+  medium: { label: "10–60 s · 0.1–1 Mb",  switchTime: "10–60 s", hours: 22, range: [100000, 1000000] },
+  long:   { label: "60–120 s · 0.2–2.5 Mb", switchTime: "60–120 s", hours: 24, range: [200000, 2500000] },
+};
+
+/** bp / kb / Mb, whichever keeps the number short. A PFGE ladder rung is
+ *  1,531,933 bp, which nobody reads as a number and everybody reads as 1.5 Mb. */
+export function sizeLabel(bp) {
+  // Trailing zero stripped only in the decimal branch — doing it unconditionally
+  // turns "10 Mb" into "1 Mb".
+  if (bp >= 1e6) {
+    return (bp % 1e6 ? (bp / 1e6).toFixed(2).replace(/0$/, "") : String(bp / 1e6)) + " Mb";
+  }
+  if (bp >= 1000) return (bp / 1000).toFixed(bp % 1000 ? 1 : 0) + " kb";
+  return bp + " bp";
+}
+
+/** Ladder keys valid in a given mode. */
+export const laddersFor = (mode) =>
+  Object.entries(LADDERS)
+    .filter(([, l]) => (l.mode || "agarose") === mode)
+    .map(([k, l]) => [k, l.label]);
 
 // ---------------------------------------------------------------------------
 // Monochrome palette — the look of a gel photographed on a gel doc, where the
@@ -62,15 +127,36 @@ const GEL = {
 const LANE_LEFT = 70;
 const LANE_RIGHT = 40;
 
+/** The visible size window: the programme's resolving range, narrowed to the
+ *  ladder actually loaded.
+ *
+ *  The two can fail to overlap — the 1–6 s pulse programme resolves 10–150 kb
+ *  and the smallest yeast chromosome is 230 kb, a pairing the UI can reach — and
+ *  the intersection then inverts. Left alone that produced a negative axis span:
+ *  no error, just a gel with every band stacked on the bottom edge, which is how
+ *  this went unnoticed while the mode itself was mis-wired. When they do not
+ *  overlap the ladder wins, because a gel you cannot read against its own size
+ *  standard is useless whatever the programme says. */
+export function sizeWindow(gelMin, gelMax, ladderSizes) {
+  const lo = Math.min(...ladderSizes), hi = Math.max(...ladderSizes);
+  const minBp = Math.max(gelMin, lo / 1.5);
+  const maxBp = Math.min(gelMax, hi * 1.5);
+  return minBp < maxBp ? [minBp, maxBp] : [lo / 1.5, hi * 1.5];
+}
+
 export function renderGel(canvas, lanes, opts) {
-  const { gelPct = 1, ladderKey = "1kb", exposure = 1, contrast = 0.5 } = opts;
-  // The agarose % sets the physical resolving limits; the chosen ladder frames
+  const { gelPct = 1, ladderKey = "1kb", exposure = 1, contrast = 0.5,
+          gelMode = "agarose", pfgeRun = "medium" } = opts;
+  // The programme sets the physical resolving limits — agarose % under a
+  // constant field, switch time under a pulsed one. The chosen ladder frames
   // the visible size window inside them, so switching ladders rescales the
   // whole gel (every lane), not just the ladder lane.
-  const [gelMin, gelMax] = RANGES[gelPct] || RANGES[1];
+  const pfge = gelMode === "pfge";
+  const [gelMin, gelMax] = pfge
+    ? (PFGE_RUNS[pfgeRun] || PFGE_RUNS.medium).range
+    : (RANGES[gelPct] || RANGES[1]);
   const ladderSizes = LADDERS[ladderKey].sizes;
-  const maxBp = Math.min(gelMax, Math.max(...ladderSizes) * 1.5);
-  const minBp = Math.max(gelMin, Math.min(...ladderSizes) / 1.5);
+  const [minBp, maxBp] = sizeWindow(gelMin, gelMax, ladderSizes);
   const ctx = canvas.getContext("2d");
   // Size the bitmap to the element's CSS box, scaled for the device pixel
   // ratio, so the gel stays crisp at any window width.
@@ -95,12 +181,20 @@ export function renderGel(canvas, lanes, opts) {
   const bandWidth = Math.min(laneW * 0.56, 120);
   const wellY = 40, trackTop = 58, trackBottom = H - 36;
 
-  // Linear in log(bp) inside the resolving range; outside it, migration is
-  // compressed (slope ×0.12) rather than clamped, so out-of-range fragments
-  // still separate slightly and stack near the top/bottom like on a real gel.
+  // Position inside the resolving range: linear in log(bp) under a constant
+  // field, linear in bp under a pulsed one. That difference is the whole point
+  // of the mode — a log scale crushes 1 Mb and 2 Mb together, and a ramped
+  // pulse programme is chosen precisely so it does not.
+  //
+  // Outside the range, migration is compressed (slope ×0.12) rather than
+  // clamped, so out-of-range fragments still separate slightly and stack near
+  // the top/bottom like on a real gel.
   const trackH = trackBottom - trackTop;
+  const span = pfge
+    ? (bp) => (maxBp - bp) / (maxBp - minBp)
+    : (bp) => (Math.log10(maxBp) - Math.log10(bp)) / (Math.log10(maxBp) - Math.log10(minBp));
   const yFor = (bp) => {
-    let t = (Math.log10(maxBp) - Math.log10(bp)) / (Math.log10(maxBp) - Math.log10(minBp));
+    let t = span(bp);
     if (t < 0) t = Math.max(t * 0.12, -12 / trackH);
     else if (t > 1) t = 1 + Math.min((t - 1) * 0.12, 24 / trackH);
     return trackTop + t * trackH;
@@ -214,7 +308,7 @@ export function renderGel(canvas, lanes, opts) {
         const y = yFor(s);
         if (y - lastLabelY < 11) continue; // skip labels that would overlap
         lastLabelY = y;
-        const txt = s >= 1000 ? (s / 1000).toFixed(s % 1000 ? 1 : 0) + " kb" : s + " bp";
+        const txt = sizeLabel(s);
         ctx.fillText(txt, x - bandWidth / 2 - 8, y + 3);
       }
     }
@@ -249,4 +343,17 @@ export function renderGel(canvas, lanes, opts) {
     ctx.fillText("Select enzymes at left and click “Add lane with selection”,", cx, H / 2 + 12);
     ctx.fillText("or press ✨ Suggest. The lane at left is the size ladder.", cx, H / 2 + 27);
   }
+
+  // Run conditions, so a saved PNG still says how the gel was run. Without it a
+  // pulsed-field image is indistinguishable from a constant-field one that has
+  // simply been given a strange ladder.
+  const run = PFGE_RUNS[pfgeRun] || PFGE_RUNS.medium;
+  ctx.fillStyle = ink(GEL.hint, 0.75);
+  ctx.font = "9px system-ui, sans-serif";
+  ctx.textAlign = "left";
+  ctx.fillText(
+    pfge
+      ? `CHEF pulsed-field · 1% agarose · ${run.switchTime} switch · ${run.hours} h`
+      : `${gelPct.toFixed(1)}% agarose · constant field`,
+    6, H - 13);
 }

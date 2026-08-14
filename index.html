@@ -99,7 +99,13 @@
       <details class="card section" id="sec-gel" open>
         <summary class="card-head"><h2>3 · Gel Setup</h2></summary>
         <div class="row">
-          <label>Agarose
+          <label>Field
+            <select id="gel-mode" title="Constant field runs out above ~20 kb; pulsed field resolves to megabases">
+              <option value="agarose" selected>Constant</option>
+              <option value="pfge">Pulsed (CHEF)</option>
+            </select>
+          </label>
+          <label id="gel-pct-label">Agarose
             <select id="gel-pct">
               <option value="0.7">0.7 %</option>
               <option value="1" selected>1.0 %</option>
@@ -107,11 +113,11 @@
               <option value="2">2.0 %</option>
             </select>
           </label>
+          <label id="pfge-run-label" hidden>Switch time
+            <select id="pfge-run" title="The pulse programme sets the resolving window"></select>
+          </label>
           <label>Ladder
-            <select id="ladder-select">
-              <option value="1kb" selected>1 kb ladder</option>
-              <option value="100bp">100 bp ladder</option>
-            </select>
+            <select id="ladder-select"></select>
           </label>
           <button id="download-gel" class="btn ghost">Save PNG</button>
         </div>

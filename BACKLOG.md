@@ -71,13 +71,18 @@ Setup. Double-click either to reset; both are saved with configurations and
 redraw the gel only (digests are cached), so they stay responsive on megabase
 sequences.
 
-## 4b. Pulsed-field gel mode
+## ~~4b. Pulsed-field gel mode~~ — done
 
-Genomes are now loadable, and rare-cutter digests of them produce megabase
-fragments that all pile up at the top of a normal agarose gel — correctly, but
-uninformatively. A PFGE mode (different migration model, a lambda-ladder /
-yeast-chromosome size standard) would make E. coli NotI digests readable, which
-is the actual experiment those fragments come from.
+A **Field** selector in Gel Setup switches between constant field and CHEF
+pulsed field, with three switch-time programmes (1–6 s / 10–60 s / 60–120 s)
+covering 10 kb to 2.5 Mb, and two pulsed-field standards: λ concatemers and
+S. cerevisiae chromosomes. Inside the resolving window migration is linear in
+size rather than in log(size), which is the property that makes a ramped-pulse
+gel readable and why the ladder spacing looks so different between the modes.
+
+On E. coli K-12 / NotI — 23 fragments, 4.3 kb to 1.08 Mb — the constant-field
+gel resolves 2 bands across 27% of the track; the same digest at 10–60 s
+resolves 10 across the full track.
 
 ## 4c. Addgene / SnapGene vector import
 

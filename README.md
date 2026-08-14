@@ -177,8 +177,38 @@ coordinates (BsaI GGTCTC(1/5), FokI GGATG(9/13), MmeI's 2 nt 3′ overhang).
 Log-linear migration calibrated to agarose percentage (0.7–2 %), with
 compressed rather than clamped migration outside the resolving range so
 oversized fragments still separate. The ladder prints dimmer than the sample
-lanes and is captioned as a size standard, and its choice (1 kb / 100 bp) sets
-the gel's zoom window. PNG export.
+lanes and is captioned as a size standard, and its choice sets the gel's zoom
+window. PNG export.
+
+#### Pulsed field (CHEF)
+
+A constant field runs out above ~20 kb: every larger fragment reaches the same
+limiting mobility and piles into one band. The **Field** selector switches to a
+CHEF pulsed field, where the field periodically changes direction and a
+molecule must reorient before it can move again — the time that takes scales
+with length, which restores size dependence out to megabases.
+
+Three switch-time programmes set the resolving window (1–6 s → 10–150 kb,
+10–60 s → 0.1–1 Mb, 60–120 s → 0.2–2.5 Mb), with two pulsed-field standards:
+**λ concatemers** (48.5 kb to 1.02 Mb) and **S. cerevisiae chromosomes**
+(230 kb to 1.53 Mb). Ladders are partitioned by mode, since a 1 kb ladder on a
+pulsed-field gel is meaningless; asking the assistant for a pulsed-field ladder
+switches the mode on its own.
+
+Inside the window, migration is linear in **size** rather than in log(size).
+That is not cosmetic — it is the property that makes a ramped-pulse gel
+readable, and it is why the λ ladder prints as evenly spaced rungs here and
+would crush together on a log axis.
+
+The difference on the experiment this exists for — E. coli K-12 cut with NotI,
+23 fragments from 4.3 kb to 1.08 Mb: a constant-field gel resolves **2** bands
+across 27 % of the track, and the same digest at 10–60 s resolves **10** across
+the full track.
+
+Neither mode is a physical simulation. Both are resolving-window models: the
+window comes from published protocol ranges and behaviour outside it is the
+same compression used everywhere else. The run conditions are drawn onto the
+gel, so a saved PNG still says how it was run.
 
 Lanes are rendered as an **accumulated intensity profile**, not one rectangle
 per fragment. Each fragment deposits a Gaussian of stain whose mass scales with
