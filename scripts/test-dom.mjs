@@ -179,6 +179,40 @@ tick("EcoRI");
 check("EcoRI does not warn", app.$("#feature-warning").hasAttribute("hidden"), true);
 app.click("#clear-sel");
 
+// --- Searching the catalog by name -------------------------------------------
+const dnaNames = () => app.$$(".dna-item .dna-name").map((e) => e.textContent);
+const searchNote = () => (app.$("#dna-search-note").hasAttribute("hidden")
+  ? null : app.$("#dna-search-note").textContent);
+
+const allNames = dnaNames();
+check("the unfiltered list shows every sample", allNames.length, 44);
+
+app.set("#dna-search", "chickenpox", "input");
+check("a common name finds the sample", dnaNames(), ["Varicella-zoster virus"]);
+check("matching groups are opened, or the hit stays hidden",
+  app.$$(".dna-groups details").every((d) => d.hasAttribute("open") || !d.querySelector(".dna-item")), true);
+
+app.set("#dna-search", "λ", "input");
+check("a symbol alias works", dnaNames().includes("Lambda phage"), true);
+
+// The point of the curated layer: a dead end becomes an explanation.
+app.set("#dna-search", "COVID 19", "input");
+check("COVID 19 matches no sample", dnaNames(), []);
+check("but the panel explains why", /RNA virus/.test(searchNote() || ""), true);
+check("and names it", /SARS-CoV-2/.test(searchNote() || ""), true);
+
+app.set("#dna-search", "pET-28a", "input");
+check("pET-28a explains where to get it", /Addgene/.test(searchNote() || ""), true);
+
+app.set("#dna-search", "zzzznothing", "input");
+check("an ordinary miss says so without a lecture", searchNote(), null);
+check("and offers the fetch route",
+  /accession/.test(app.$("#dna-groups").textContent), true);
+
+app.set("#dna-search", "", "input");
+check("clearing the box restores the full list", dnaNames().length, allNames.length);
+check("and clears the note", searchNote(), null);
+
 // --- Cut a feature out -------------------------------------------------------
 check("the excise row is shown on annotated DNA", app.$("#excise-row").hasAttribute("hidden"), false);
 const targets = app.$$("#excise-feature option").map((o) => o.textContent);

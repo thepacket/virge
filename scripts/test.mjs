@@ -6,6 +6,7 @@ import { digest, findSites, findCuts } from "../src/digest.js";
 import { suggestDigests, excisionOptions } from "../src/suggest.js";
 import { parseAny, sequenceStats, ParseError, featuresCutBy } from "../src/genbank.js";
 import { LADDERS, PFGE_RUNS, laddersFor, sizeLabel, sizeWindow } from "../src/gel.js";
+import { searchSamples, searchNcbi, EXCLUDED } from "../src/dna-search.js";
 
 let pass = 0, fail = 0;
 const check = (label, got, want) => {
@@ -257,6 +258,111 @@ const overlapping = [
 check("overlapping features both reported", featuresCutBy([50], overlapping).map((h) => h.label), ["a", "b"]);
 check("but the cut is counted once",
   new Set(featuresCutBy([50], overlapping).flatMap((h) => h.cuts)).size, 1);
+
+// --- Finding DNA by name ----------------------------------------------------
+const find = (q) => searchSamples(q, SAMPLES);
+const found = (q) => find(q).keys;
+
+// An empty query is "no filter", which is not the same as "no matches" — the UI
+// has to tell those apart or an empty box hides the whole catalog.
+check("an empty query does not filter", find("").keys, null);
+check("a query with no match returns an empty list, not null", found("zzzznothing"), []);
+
+check("common names find their sample", [
+  found("lambda").includes("lambda"),
+  found("epstein barr").includes("EBV"),
+  found("chickenpox").includes("VZV"),
+  found("mtDNA").includes("humanMito"),
+  found("green fluorescent protein").includes("pEGFP_N1"),
+  found("2-micron").includes("twoMicron"),
+], [true, true, true, true, true, true]);
+
+// Punctuation and spacing people actually type.
+check("spelling variants normalise", [
+  found("pUC 19").includes("pUC19"),
+  found("phi x 174").includes("phiX174"),
+  found("E. coli").includes("ecoliK12"),
+  found("hsv-1").includes("HSV1"),
+], [true, true, true, true]);
+
+// Multi-word queries where no single field contains the whole phrase.
+check("all-words fallback finds yeast chromosome I", found("yeast chromosome").includes("yeastChrI"), true);
+
+// The point of the curated layer: absence gets explained, not silently returned
+// as zero results. NCBI's own answer to "COVID 19" is 185,232 records led by
+// Klebsiella plasmids, which is why this is a hand-written map.
+const covid = find("COVID 19");
+check("COVID 19 finds nothing in the catalog", covid.keys, []);
+check("but says why", covid.note?.title, "SARS-CoV-2");
+check("and names the actual reason", /RNA/.test(covid.note.reason), true);
+for (const q of ["covid", "SARS-CoV-2", "coronavirus", "sars cov 2"]) {
+  check(`"${q}" is explained`, find(q).note?.title, "SARS-CoV-2");
+}
+check("pET-28a is explained as an Addgene vector",
+  find("pET-28a").note?.title, "Commercial and Addgene vectors");
+check("and points at file import", /Addgene|drop it/.test(find("pET28a").note.reason), true);
+check("influenza is explained as RNA", find("influenza").note?.title, "RNA viruses");
+
+// A note may accompany real matches: "hepatitis" should still find HBV.
+const hep = find("hepatitis");
+check("hepatitis still finds HBV", hep.keys.includes("HBV"), true);
+
+// Word-boundary matching, or "hiv" fires on "archive" and "flu" on "cauliflower".
+check("exclusions do not match inside unrelated words",
+  [find("archive").note, find("cauliflower").note], [null, null]);
+
+// Nothing in the exclusion list may name something the catalog actually has,
+// or a real sample would be reported as deliberately missing.
+check("no exclusion shadows a bundled sample",
+  EXCLUDED.flatMap((e) => e.terms).filter((t) => (searchSamples(t, SAMPLES).keys || []).length > 0), []);
+
+// --- NCBI search returns candidates, never a verdict -------------------------
+// Fed a recorded response rather than the live API, so this pins the shape and
+// the digestibility rules without depending on the network. The records are
+// real: these are the first hits NCBI actually returns for "COVID 19" and for
+// SARS-CoV-2, which is the whole argument for making this a picker.
+const fakeNcbi = (search, summary) => async (url) => ({
+  ok: true,
+  json: async () => (url.includes("esearch") ? search : summary),
+});
+const ncbi = await searchNcbi("COVID 19", {
+  fetchImpl: fakeNcbi(
+    { esearchresult: { count: "185232", idlist: ["1", "2", "3"] } },
+    { result: {
+      uids: ["1", "2", "3"],
+      1: { accessionversion: "PZ502748.1", title: "Klebsiella pneumoniae strain NMI5947/24 plasmid p5947FH.",
+           slen: 360919, topology: "circular", moltype: "dna", strand: "ds" },
+      2: { accessionversion: "PZ818926.1", title: "Severe acute respiratory syndrome coronavirus 2 isolate",
+           slen: 29841, topology: "linear", moltype: "rna", strand: "ss" },
+      3: { accessionversion: "NC_001422.1", title: "Escherichia phage phiX174",
+           slen: 5386, topology: "circular", moltype: "dna", strand: "ss" },
+    } }),
+});
+check("the true hit count is reported, not just the page", ncbi.total, 185232);
+check("every hit comes back, unranked", ncbi.hits.map((h) => h.accession),
+  ["PZ502748.1", "PZ818926.1", "NC_001422.1"]);
+// The top hit for "COVID 19" really is a Klebsiella plasmid. Auto-loading it
+// would be a confident wrong answer, which is why the UI must not choose.
+check("the top COVID hit is an unrelated plasmid", /Klebsiella/.test(ncbi.hits[0].title), true);
+check("dsDNA is digestible with no caveat",
+  [ncbi.hits[0].digestible, ncbi.hits[0].caveat], [true, null]);
+check("RNA is flagged as not digestible", ncbi.hits[1].digestible, false);
+check("with a reason", /RNA/.test(ncbi.hits[1].caveat), true);
+check("ssDNA is digestible but caveated",
+  [ncbi.hits[2].digestible, /replicative/.test(ncbi.hits[2].caveat)], [true, true]);
+
+// esummary reports "not-set" for records that never declared a topology;
+// printing that verbatim reads like a broken field.
+const noTopo = await searchNcbi("x", {
+  fetchImpl: fakeNcbi({ esearchresult: { count: "1", idlist: ["1"] } },
+    { result: { uids: ["1"], 1: { accessionversion: "X.1", title: "t", slen: 10,
+                                  topology: "not-set", moltype: "dna", strand: "ds" } } }),
+});
+check("an undeclared topology is absent, not \"not-set\"", noTopo.hits[0].topology, null);
+
+check("an empty result set is not an error",
+  await searchNcbi("zzz", { fetchImpl: fakeNcbi({ esearchresult: { count: "0", idlist: [] } }, {}) }),
+  { total: 0, hits: [] });
 
 // --- Cutting a feature out in one piece -------------------------------------
 const featureNamed = (label) =>

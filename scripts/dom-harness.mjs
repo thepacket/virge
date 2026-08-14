@@ -69,6 +69,21 @@ function patchSelectValue(window, document) {
   });
 }
 
+/** `details.open` is a reflected boolean attribute: browsers mirror the property
+ *  onto the attribute, linkedom does not. Without this, `d.open = true` leaves
+ *  `[open]` absent and a test asserting on the attribute fails against code that
+ *  is correct in a browser. */
+function patchDetailsOpen(document) {
+  const proto = document.createElement("details").constructor.prototype;
+  if (Object.getOwnPropertyDescriptor(proto, "__virgeOpen")) return;
+  Object.defineProperty(proto, "__virgeOpen", { value: true });
+  Object.defineProperty(proto, "open", {
+    configurable: true,
+    get() { return this.hasAttribute("open"); },
+    set(v) { v ? this.setAttribute("open", "") : this.removeAttribute("open"); },
+  });
+}
+
 /**
  * Builds the DOM, installs globals, and imports main.js.
  *
@@ -104,6 +119,7 @@ export async function loadApp() {
   // option, so `el.value = "pfge"` throws. Browsers accept the assignment and
   // move the selection, and main.js relies on that, so make it behave.
   patchSelectValue(window, document);
+  patchDetailsOpen(document);
 
   Object.assign(globalThis, {
     window,

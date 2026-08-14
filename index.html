@@ -26,6 +26,9 @@
       <div class="pane-body" id="pane-left-body">
       <details class="card section" id="sec-dna" open>
         <summary class="card-head"><h2>1 · DNA Source</h2></summary>
+        <input type="search" id="dna-search" class="dna-search"
+               placeholder="Search by name — “lambda”, “chickenpox”, “GFP”…" />
+        <div id="dna-search-note" class="warning" hidden></div>
         <div id="dna-groups" class="dna-groups"></div>
         <div class="dna-meta" id="dna-meta"></div>
         <div id="import-status" class="hint" role="status"></div>
@@ -50,6 +53,13 @@
             <input type="text" id="accession-input" placeholder="Or fetch by accession (e.g. NC_005816)" />
             <button id="fetch-accession" class="btn">Fetch</button>
           </div>
+
+          <div class="row">
+            <input type="search" id="ncbi-query" placeholder="Search NCBI by name…" />
+            <button id="ncbi-search" class="btn">Search NCBI</button>
+          </div>
+          <div id="ncbi-status" class="hint" role="status"></div>
+          <div id="ncbi-results" class="ncbi-results" hidden></div>
 
           <textarea id="seq-input" rows="4" spellcheck="false"
             placeholder="…or paste GenBank, FASTA, or raw sequence"></textarea>

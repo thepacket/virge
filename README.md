@@ -70,6 +70,36 @@ sequences with no clean GenBank deposition — searching NCBI for them returns
 unrelated fragments, not the vectors. Download the GenBank file from Addgene or
 your supplier and drop it in; annotations come along.
 
+### Finding DNA by name
+A search box over the catalog matches common names, symbols and spellings —
+*chickenpox* finds VZV, *λ* finds lambda, *GFP* finds the pEGFP vectors, *mtDNA*
+finds the human mitochondrion, *E. coli* finds both genomes.
+
+**A query that matches nothing explains why**, because that is usually the
+useful answer. Searching *COVID 19* says SARS-CoV-2 is an RNA virus and
+restriction enzymes cut double-stranded DNA only; searching *pET-28a* says it
+has no clean GenBank deposition and points at file import. Those two cases cover
+most of what people look for and do not find.
+
+The alias and exclusion lists are **hand-written on purpose**. Handing the query
+straight to NCBI is worse than useless here, measurably: nuccore's first five
+hits for "COVID 19" are *Klebsiella pneumoniae plasmids* (the pandemic is named
+in their isolation-source metadata), and its fifteen hits for "pET-28a" include
+a patent fragment, a clam mRNA and an uncultured-bacterium glucanase — but not
+the vector. A regression test enforces that no exclusion term names something
+the catalog actually carries.
+
+### Searching NCBI
+**Search NCBI** queries nuccore and lists every candidate with its accession,
+length, topology and molecule type, and you pick. It never auto-loads a hit,
+for the reason above — the top result is frequently unrelated, and NCBI ranks by
+recency rather than relevance, which the results header says out loud.
+
+Records a restriction enzyme cannot cut are **disabled rather than offered**:
+RNA is refused outright, and single-stranded genomes are marked as cuttable only
+as their replicative form. This is the same rule the sample build enforces, so a
+search cannot introduce what the catalog is not allowed to contain.
+
 Bring your own sequence four ways:
 
 - **Drop a file** — GenBank (`.gb`, `.gbk`) or FASTA, including multi-record
@@ -376,6 +406,8 @@ pasted sequence embed it, so they stay portable.
 - `src/main.js` — UI state, config library, wiring
 - `src/assistant.js` — AI assistant: key handling, tool loop, chat UI
 - `src/assistant-config.js` — assistant system prompt and tool schemas
+- `src/dna-search.js` — curated name aliases, the "deliberately absent, and
+  here is why" list, and the NCBI candidate search
 - `scripts/check-csp.mjs` — fails the build if the source fetches a host the
   production CSP forbids (dev applies no CSP, so nothing else catches it)
 - `Dockerfile`, `nginx.conf`, `security-headers.conf`, `fly.toml` — deployment

@@ -6,6 +6,7 @@ import { suggestDigests, excisionOptions } from "./suggest.js";
 import { renderGel, LADDERS, PFGE_RUNS, laddersFor } from "./gel.js";
 import { parseAny, sequenceStats, featuresInRange, featuresCutBy, PROTECTED_FEATURES } from "./genbank.js";
 import { initAssistant, registerAssistantApp } from "./assistant.js";
+import { searchSamples, searchNcbi } from "./dna-search.js";
 
 const $ = (sel) => document.querySelector(sel);
 
@@ -27,6 +28,7 @@ const state = {
   search: "",
   tier: 2,
   cutFilter: "any",  // "any" | "cutters" | "unique"
+  dnaSearch: "",
 };
 
 // ---------- DNA loading ----------
@@ -114,6 +116,61 @@ function acceptRecords(records, origin) {
   renderDnaGroups();
 }
 
+// ---------- NCBI name search ----------
+/**
+ * Deliberately a picker, not an oracle.
+ *
+ * Every hit is listed with its accession, length, topology and molecule type,
+ * and the user chooses. Auto-loading the top hit would be a confident wrong
+ * answer often enough to be dangerous: NCBI's first five records for "COVID 19"
+ * are Klebsiella pneumoniae plasmids, and its results for "pET-28a" contain a
+ * patent fragment and a clam mRNA but not the vector.
+ */
+async function runNcbiSearch() {
+  const term = $("#ncbi-query").value.trim();
+  const results = $("#ncbi-results"), status = $("#ncbi-status");
+  if (!term) return;
+
+  results.hidden = true;
+  results.innerHTML = "";
+  status.textContent = `Searching NCBI for “${term}”…`;
+  status.classList.remove("error");
+
+  try {
+    const { total, hits } = await searchNcbi(term);
+    if (!hits.length) {
+      status.textContent = `Nothing on NCBI for “${term}”.`;
+      return;
+    }
+    status.textContent = total > hits.length
+      ? `${total.toLocaleString()} records match; showing the first ${hits.length}. Pick one — NCBI ranks by recency, not relevance.`
+      : `${hits.length} record${hits.length === 1 ? "" : "s"}.`;
+
+    results.innerHTML = hits.map((h) => `
+      <button class="ncbi-hit${h.digestible ? "" : " undigestible"}"
+              data-acc="${escapeHtml(h.accession)}" ${h.digestible ? "" : "disabled"}
+              title="${escapeHtml(h.title)}">
+        <span class="ncbi-title">${escapeHtml(h.title)}</span>
+        <span class="hint">${[
+          escapeHtml(h.accession),
+          `${Number(h.length).toLocaleString()} bp`,
+          h.topology ? escapeHtml(h.topology) : null,
+          h.caveat ? `<em>${escapeHtml(h.caveat)}</em>` : null,
+        ].filter(Boolean).join(" · ")}</span>
+      </button>`).join("");
+    results.hidden = false;
+
+    results.querySelectorAll(".ncbi-hit").forEach((b) =>
+      b.addEventListener("click", () => {
+        $("#accession-input").value = b.dataset.acc;
+        fetchAccession(b.dataset.acc);
+      }));
+  } catch (err) {
+    status.textContent = `NCBI search failed: ${err.message}`;
+    status.classList.add("error");
+  }
+}
+
 // ---------- UI: grouped DNA picker ----------
 const openGroups = new Set(); // group of the initial DNA is added in initSamples
 
@@ -173,25 +230,45 @@ function renderDnaGroups() {
   wrap.innerHTML = "";
 
   const userSeqs = readUserSeqs();
+
+  // Name search, over the catalog and over a curated list of things we
+  // deliberately do not carry. A query that matches nothing is a dead end; a
+  // query that matches nothing *and explains why* is an answer.
+  const { keys, note } = searchSamples(state.dnaSearch, SAMPLES);
+  const noteBox = $("#dna-search-note");
+  noteBox.hidden = !note;
+  if (note) noteBox.textContent = `${note.title} — ${note.reason}`;
+  const matches = keys && new Set(keys);
+
   const groups = [
     ...GROUPS.map((g) => ({
       title: g,
       items: Object.entries(SAMPLES)
-        .filter(([, s]) => s.group === g)
+        .filter(([k, s]) => s.group === g && (!matches || matches.has(k)))
         .sort(([, a], [, b]) => a.name.localeCompare(b.name)),
       removable: false,
     })),
-  ];
+  ].filter((g) => g.items.length || !matches);
+
   const userItems = Object.entries(userSeqs)
     .map(([name, s]) => [`user:${name}`, { ...s, length: s.sequence.length }])
+    .filter(([, s]) => !matches || s.name.toLowerCase().includes(state.dnaSearch.toLowerCase()))
     .sort(([, a], [, b]) => a.name.localeCompare(b.name));
   if (userItems.length) {
     groups.unshift({ title: "Your sequences", items: userItems, removable: true });
   }
 
+  if (matches && !groups.length) {
+    wrap.innerHTML = `<p class="hint">No sample matches “${escapeHtml(state.dnaSearch)}”.` +
+      ` You can still fetch it by accession, or search NCBI, below.</p>`;
+    return;
+  }
+
   for (const { title, items, removable } of groups) {
     const det = document.createElement("details");
-    det.open = openGroups.has(title);
+    // While filtering, open every group that still has hits — a match hidden
+    // inside a collapsed group reads as no match at all.
+    det.open = matches ? true : openGroups.has(title);
     det.innerHTML =
       `<summary>${escapeHtml(title)} <span class="count">${items.length}</span></summary>` +
       items.map(([key, s]) => dnaItemHtml(key, s, removable)).join("");
@@ -304,6 +381,16 @@ async function fetchAccession(acc) {
 }
 
 $("#fetch-accession").addEventListener("click", () => fetchAccession($("#accession-input").value));
+
+$("#ncbi-search").addEventListener("click", runNcbiSearch);
+$("#ncbi-query").addEventListener("keydown", (e) => {
+  if (e.key === "Enter") { e.preventDefault(); runNcbiSearch(); }
+});
+
+$("#dna-search").addEventListener("input", (e) => {
+  state.dnaSearch = e.target.value;
+  renderDnaGroups();
+});
 $("#accession-input").addEventListener("keydown", (e) => {
   if (e.key === "Enter") fetchAccession(e.target.value);
 });
