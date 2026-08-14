@@ -2,9 +2,9 @@ import { SAMPLES, GROUPS } from "./data/samples.js";
 import { ENZYMES, lookup, endType, siteWithCut, bufferWarning,
          overhangSignature, compatibleEnds } from "./enzymes.js";
 import { digest, findCuts } from "./digest.js";
-import { suggestDigests } from "./suggest.js";
+import { suggestDigests, excisionOptions } from "./suggest.js";
 import { renderGel, LADDERS, PFGE_RUNS, laddersFor } from "./gel.js";
-import { parseAny, sequenceStats, featuresInRange, featuresCutBy } from "./genbank.js";
+import { parseAny, sequenceStats, featuresInRange, featuresCutBy, PROTECTED_FEATURES } from "./genbank.js";
 import { initAssistant, registerAssistantApp } from "./assistant.js";
 
 const $ = (sel) => document.querySelector(sel);
@@ -505,6 +505,73 @@ $("#suggest-digests").addEventListener("click", () => {
 
 $("#suggest-purpose").addEventListener("change", () => { $("#suggest-note").hidden = true; });
 
+// ---------- Cut out a feature ----------
+// Below this, "cutting the feature out" is meaningless: the excised fragment
+// would be essentially all flanking DNA, and purifying the band would tell you
+// nothing about the feature. pBR322 annotates its rep_origin as a *single base*
+// (position 2535) — real GenBank data rather than a parse artefact, and not
+// something you can cut out.
+const MIN_EXCISABLE_BP = 100;
+
+/** Named genes and origins worth excising. Hidden entirely on unannotated DNA
+ *  rather than offering an empty control. */
+function exciseTargets() {
+  const seen = new Set();
+  return state.features.filter((f) => {
+    if (!f.label || !PROTECTED_FEATURES.has(f.type)) return false;
+    const bp = Math.max(...f.segments.map((s) => s.end)) - Math.min(...f.segments.map((s) => s.start));
+    if (bp < MIN_EXCISABLE_BP) return false;
+    // pBR322 carries tet as both a gene and a CDS; one entry per gene.
+    if (seen.has(f.label)) return false;
+    seen.add(f.label);
+    return true;
+  });
+}
+
+function renderExciseTargets() {
+  const targets = exciseTargets();
+  $("#excise-row").hidden = targets.length === 0;
+  if (!targets.length) return;
+  const keep = $("#excise-feature").value;
+  $("#excise-feature").innerHTML = targets
+    .map((f, i) => {
+      const bp = Math.max(...f.segments.map((s) => s.end)) - Math.min(...f.segments.map((s) => s.start));
+      return `<option value="${i}">${escapeHtml(f.label)} · ${bp.toLocaleString()} bp</option>`;
+    }).join("");
+  if (targets[keep]) $("#excise-feature").value = keep;
+}
+
+$("#excise-go").addEventListener("click", () => {
+  const feature = exciseTargets()[$("#excise-feature").value];
+  if (!feature) return;
+
+  const options = excisionOptions(state.seq, state.circular, feature, {
+    methylation: state.methylation,
+    tier: state.tier,
+  });
+
+  const note = $("#suggest-note");
+  if (!options.length) {
+    note.textContent =
+      `No enzyme in this tier cuts ${feature.label} out cleanly — every candidate either ` +
+      `cuts inside it or cannot share a tube with its partner. Try widening the tier.`;
+    note.hidden = false;
+    return;
+  }
+
+  const best = options[0];
+  note.textContent =
+    `${best.names.join(" + ")} cuts ${feature.label} out in a ${best.size.toLocaleString()} bp ` +
+    `fragment — ${best.upstream.toLocaleString()} bp upstream and ` +
+    `${best.downstream.toLocaleString()} bp downstream come with it.`;
+  note.hidden = false;
+
+  // Same convention as Suggest: replace the gel, since the options are meant to
+  // be compared against each other rather than against whatever was loaded.
+  state.lanes = options.map((o) => ({ enzymeNames: o.names }));
+  renderAll();
+});
+
 // ---------- Configuration library (localStorage) ----------
 const LIB_KEY = "virge-library";
 
@@ -881,6 +948,7 @@ function renderGelOnly() {
 function renderAll() {
   renderDnaGroups();
   renderMeta();
+  renderExciseTargets();
   renderEnzymes();
   lastLanes = computedLanes();
   renderGelOnly();

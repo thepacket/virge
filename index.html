@@ -85,6 +85,13 @@
             <option value="unique">Unique (1×)</option>
           </select>
         </div>
+        <div class="row excise-row" id="excise-row" hidden>
+          <label>Cut out
+            <select id="excise-feature" title="Annotated genes and origins on the loaded DNA"></select>
+          </label>
+          <button id="excise-go" class="btn small"
+                  title="Find enzymes that cut on both sides of this feature and nowhere inside it">✂ Excise</button>
+        </div>
         <div id="suggest-note" class="warning" hidden></div>
         <div id="enzyme-count" class="hint"></div>
         <div id="enzyme-list" class="enzyme-grid"></div>

@@ -3,7 +3,7 @@
 import { SAMPLES } from "../src/data/samples.js";
 import { lookup, ENZYMES, overhangSignature, compatibleEnds, bufferWarning } from "../src/enzymes.js";
 import { digest, findSites, findCuts } from "../src/digest.js";
-import { suggestDigests } from "../src/suggest.js";
+import { suggestDigests, excisionOptions } from "../src/suggest.js";
 import { parseAny, sequenceStats, ParseError, featuresCutBy } from "../src/genbank.js";
 import { LADDERS, PFGE_RUNS, laddersFor, sizeLabel, sizeWindow } from "../src/gel.js";
 
@@ -246,6 +246,78 @@ const overlapping = [
 check("overlapping features both reported", featuresCutBy([50], overlapping).map((h) => h.label), ["a", "b"]);
 check("but the cut is counted once",
   new Set(featuresCutBy([50], overlapping).flatMap((h) => h.cuts)).size, 1);
+
+// --- Cutting a feature out in one piece -------------------------------------
+const featureNamed = (label) =>
+  pbr.features.find((f) => f.label === label && f.type === "CDS") ||
+  pbr.features.find((f) => f.label === label);
+const excise = (label, opts = {}) =>
+  excisionOptions(pbr.sequence, true, featureNamed(label), { methylation: "dam_dcm", tier: 2, ...opts });
+
+const tetOptions = excise("tet");
+check("tet can be excised from pBR322", tetOptions.length > 0, true);
+
+// The defining property: nothing may cut inside the feature, or it is destroyed
+// rather than excised.
+//
+// Asserting this over the pBR322 options is true but useless as a regression
+// test — removing *both* guards in excisionOptions leaves it green, because on
+// real DNA the well-scoring options happen not to cut inside anyway. So the
+// property is pinned on a constructed case instead: poly-A carrying one EcoRI
+// site inside the feature and no other site anywhere. Exactly three enzymes cut
+// this sequence (EcoRI, MluCI, Tsp509I), all at the same position inside the
+// gene, so a correct search has nothing to offer.
+const trapSeq = "A".repeat(200) + "GAATTC" + "A".repeat(200);
+const trapFeature = { label: "g", type: "CDS", segments: [{ start: 150, end: 260 }] };
+check("an enzyme cutting only inside the feature is never offered",
+  excisionOptions(trapSeq, true, trapFeature, { tier: 3 }), []);
+
+const tetSpan = featureNamed("tet").segments;
+const insideTet = (names) => {
+  const cuts = [...new Set(names.flatMap((n) =>
+    findCuts(pbr.sequence, lookup(n), true, "dam_dcm")))];
+  const lo = Math.min(...tetSpan.map((s) => s.start)), hi = Math.max(...tetSpan.map((s) => s.end));
+  return cuts.filter((c) => c > lo && c < hi).length;
+};
+check("no excision option cuts inside tet",
+  tetOptions.every((o) => insideTet(o.names) === 0), true);
+
+// The excised fragment has to actually contain the feature, with the reported
+// flanks adding up — otherwise "1,396 bp" is a number with no meaning.
+const tetLen = Math.max(...tetSpan.map((s) => s.end)) - Math.min(...tetSpan.map((s) => s.start));
+check("flanks and feature account for the whole fragment",
+  tetOptions.every((o) => o.upstream + tetLen + o.downstream === o.size), true);
+check("the fragment is at least as long as the feature",
+  tetOptions.every((o) => o.size >= tetLen), true);
+
+// AvaI + HindIII is the expected answer: HindIII cuts at 29, upstream of tet
+// (85..1276), and AvaI at 1425 downstream, so the gene comes off in 1,396 bp.
+check("best tet excision is AvaI + HindIII", tetOptions[0].names.sort(), ["AvaI", "HindIII"]);
+check("and the fragment is 1,396 bp", tetOptions[0].size, 1396);
+
+// bla is a different gene at the other end of the plasmid, so a real search
+// must return different enzymes — not whatever scored well last time.
+const blaOptions = excise("bla");
+check("bla excises too", blaOptions.length > 0, true);
+check("bla needs different enzymes than tet",
+  blaOptions[0].names.join("+") === tetOptions[0].names.join("+"), false);
+check("no bla option cuts inside tet's neighbour gene",
+  blaOptions.every((o) => {
+    const span = featureNamed("bla").segments;
+    const lo = Math.min(...span.map((s) => s.start)), hi = Math.max(...span.map((s) => s.end));
+    const cuts = [...new Set(o.names.flatMap((n) =>
+      findCuts(pbr.sequence, lookup(n), true, "dam_dcm")))];
+    return cuts.filter((c) => c > lo && c < hi).length === 0;
+  }), true);
+
+// Enzyme pairs that cannot share one tube must never be offered, the same rule
+// Suggest follows.
+check("no excision pair clashes on temperature",
+  [...tetOptions, ...blaOptions].every((o) => !bufferWarning(o.names.map(lookup))), true);
+
+check("a feature spanning the whole molecule cannot be excised",
+  excisionOptions("ACGT".repeat(50), true,
+    { label: "x", type: "CDS", segments: [{ start: 0, end: 200 }] }, {}), []);
 
 // --- Pulsed-field mode ------------------------------------------------------
 // The λ PFG marker is a concatemer series, so every rung must be an exact

@@ -148,6 +148,23 @@ because an unbounded band-count reward swamped the band-count penalty, and
 isoschizomers were offered as if they were different experiments. Those
 properties are now pinned by tests.
 
+### Cutting a feature out
+✂ **Cut out** picks a named gene or origin from the loaded annotations and finds
+enzyme sets that cut on both sides of it and nowhere inside — the bench task of
+lifting a gene off the backbone intact so it can be gel-purified.
+
+It reports the excised fragment and the flanking DNA that comes with it: on
+pBR322, **AvaI + HindIII** takes *tet* off in a 1,396 bp fragment with 56 bp
+upstream and 149 bp downstream, and **BamHI + BspHI** takes *bla* off in
+1,008 bp. Excess flank is what the scoring minimises, since that is what makes
+the band hard to tell from the backbone; fewer cuts and commoner enzymes are
+secondary. Pairs that cannot share a tube are rejected, as in Suggest.
+
+Selecting enzymes by hand also warns when a cut lands **inside** an annotated
+feature — the "will this destroy my insert?" check. Both paths go through
+`featuresCutBy()`, so the suggestion engine and the manual panel cannot disagree
+about what counts as cutting a gene.
+
 ### Methylation
 Digests are computed in a methylation context, because a plasmid from a
 standard miniprep is *not* naked DNA:

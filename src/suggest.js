@@ -173,3 +173,106 @@ export function suggestDigests(seq, circular, {
   }
   return picked;
 }
+
+/**
+ * Enzyme sets that cut a named feature out in one piece.
+ *
+ * The bench task behind "cut out this feature": find enzymes that cut on both
+ * sides of a gene and nowhere inside it, so the gene comes off the backbone
+ * intact and can be gel-purified. Suggest already avoided cutting through genes
+ * as one term among six; this optimises for it directly.
+ *
+ * `feature` is a parsed GenBank feature. Its overall span is used, so a joined
+ * CDS is treated as the whole region from first exon start to last exon end —
+ * cutting inside an intron would still be reported as unsafe, which is the
+ * conservative direction.
+ *
+ * Returns `[{ names, size, upstream, downstream, cuts }]`, best first:
+ * `size` is the excised fragment, `upstream`/`downstream` the flanking DNA
+ * carried along with it.
+ */
+export function excisionOptions(seq, circular, feature, {
+  methylation = "none", tier = 2, count = 3, maxCuts = 12,
+} = {}) {
+  if (!feature?.segments?.length) return [];
+  const len = seq.length;
+  const featStart = Math.min(...feature.segments.map((s) => s.start));
+  const featEnd = Math.max(...feature.segments.map((s) => s.end));
+  const featLen = featEnd - featStart;
+  if (featLen <= 0 || featLen >= len) return [];
+
+  // Drop enzymes that cut inside the feature. This is a *prune*, not the safety
+  // guarantee — the containment search below is what actually enforces it, and
+  // removing this line alone leaves every test green. It earns its place on
+  // cost: on pBR322/tet it takes the candidate set from 35 enzymes (595 pairs)
+  // to 20 (190 pairs).
+  //
+  // A cut exactly on the boundary is allowed: that is a clean excision, not a
+  // broken gene.
+  const usable = [];
+  for (const e of ENZYMES) {
+    if ((e.tier ?? 3) > tier) continue;
+    const cuts = findCuts(seq, e, circular, methylation);
+    if (!cuts.length || cuts.length > maxCuts) continue;
+    if (cuts.some((c) => c > featStart && c < featEnd)) continue;
+    usable.push({ e, cuts });
+  }
+
+  const results = [];
+  const consider = (parts) => {
+    const enzymes = parts.map((p) => p.e);
+    if (bufferWarning(enzymes)) return;           // cannot share one tube
+    const cuts = [...new Set(parts.flatMap((p) => p.cuts))].sort((a, b) => a - b);
+    if (cuts.length < (circular ? 2 : 1)) return;
+
+    const frag = fragmentsFromCuts(cuts, len, circular).find((f) => {
+      // Circular fragments may wrap past the origin, so containment is checked
+      // on the unwrapped interval rather than with a plain start <= end test.
+      const end = f.end > f.start ? f.end : f.end + len;
+      const fs = featStart < f.start ? featStart + len : featStart;
+      const fe = fs + featLen;
+      return fs >= f.start && fe <= end;
+    });
+    if (!frag) return;
+
+    const upstream = (featStart - frag.start + len) % len;
+    const downstream = frag.size - upstream - featLen;
+    if (downstream < 0) return;
+
+    // Excess flanking DNA is the thing to minimise — it is what makes the band
+    // hard to tell from the backbone. Extra cuts and rarer enzymes are real but
+    // secondary costs.
+    const excess = upstream + downstream;
+    const tightness = featLen / (featLen + excess);          // 1 = perfect
+    const simplicity = 1 / (1 + (cuts.length - 2) * 0.15);
+    const common = enzymes.reduce((a, e) => a + (e.tier === 1 ? 1 : 0.7), 0) / enzymes.length;
+    // Bands within ~10% of each other do not separate; a fragment too close to
+    // the rest of the molecule cannot be cut out of the gel in practice.
+    const distinct = Math.abs(frag.size - (len - frag.size)) / len > 0.1 ? 1 : 0.4;
+
+    results.push({
+      names: enzymes.map((e) => e.name),
+      size: frag.size, upstream, downstream, cuts: cuts.length,
+      score: tightness * 3 + simplicity * 1 + common * 1 + distinct * 1.5,
+    });
+  };
+
+  for (const p of usable) consider([p]);
+  for (let i = 0; i < usable.length; i++)
+    for (let j = i + 1; j < usable.length; j++) consider([usable[i], usable[j]]);
+
+  results.sort((a, b) => b.score - a.score);
+
+  // Different enzyme names producing the same excised fragment are the same
+  // experiment; offer distinct outcomes rather than isoschizomer variants.
+  const seen = new Set();
+  const picked = [];
+  for (const r of results) {
+    const key = `${r.size}:${r.upstream}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    picked.push(r);
+    if (picked.length >= count) break;
+  }
+  return picked;
+}

@@ -29,6 +29,19 @@ const tick = (name) => {
 check("starts with the four demo lanes", lanes(), 4);
 check("gel draws its ladder caption", app.drawnText().includes("1 kb ladder"), true);
 
+// --- `hidden` is honoured ----------------------------------------------------
+// An author `display: flex` rule beat the UA stylesheet, so [hidden] elements
+// stayed visible until a global override was added. The attribute is the
+// contract the JS relies on.
+//
+// This has to run at boot. It sat at the end of the file and passed only
+// because nothing before it had shown those elements — adding the excise tests,
+// which legitimately reveal #suggest-note, turned it red and showed it had
+// been asserting "currently hidden", not "starts hidden".
+for (const id of ["#feature-warning", "#buffer-warning", "#ends-info", "#suggest-note"]) {
+  check(`${id} starts hidden`, app.$(id).hasAttribute("hidden"), true);
+}
+
 // --- Pulsed field actually engages ------------------------------------------
 // renderGel destructured `mode` while main.js passed `gelMode`, so switching
 // the control changed nothing that was drawn. The sample lane still looked
@@ -99,6 +112,43 @@ app.click("#suggest-digests");
 check("clicking Suggest twice is idempotent", laneNames(), firstPicks);
 check("a second click still leaves three lanes", lanes(), 3);
 
+// --- Lane captions do not collide -------------------------------------------
+// The harness's measureText is a stub (6px per character), so these assert the
+// layout *rule*, not the exact metrics: captions must never overlap a same-row
+// neighbour, whatever the lane width.
+const captions = () => {
+  const ys = new Set(app.calls.filter((c) => c.op === "fillText" && c.y < 32).map((c) => c.y));
+  const rows = [...ys].map((y) => app.calls
+    .filter((c) => c.op === "fillText" && c.y === y)
+    .map((c) => ({ x: c.x, w: c.text.length * 6 }))
+    .sort((a, b) => a.x - b.x));
+  return rows;
+};
+const overlaps = (rows) => rows.some((row) =>
+  row.slice(1).some((c, i) => row[i].x + row[i].w / 2 > c.x - c.w / 2));
+
+// Enough lanes that the captions are genuinely wider than their lane. At the
+// harness's 760px canvas, eight lanes give laneW ≈ 81px against a caption like
+// "EcoRI + HindIII" at ~90px. With four lanes everything fits regardless, which
+// is how the first version of this check passed against the old code too.
+app.reset();
+app.click("#clear-lanes");
+const pairs = [["EcoRI", "HindIII"], ["BamHI", "PstI"], ["SalI", "XbaI"], ["KpnI", "SacI"],
+               ["SphI", "XhoI"], ["ClaI", "NcoI"], ["NdeI", "SpeI"], ["SmaI", "NotI"]];
+for (const pair of pairs) {
+  for (const n of pair) tick(n);
+  app.click("#add-lane");
+}
+check("eight multi-enzyme lanes added", lanes(), pairs.length);
+app.reset();
+app.set("#gel-pct", "1");           // force a redraw with the long captions
+const rows = captions();
+check("a caption is wider than its lane here",
+  rows.flat().some((c) => c.w > (760 - 110) / (pairs.length + 1) - 6), true);
+check("long captions never overlap a same-row neighbour", overlaps(rows), false);
+check("long captions are staggered onto two rows", rows.length >= 2, true);
+app.click("#clear-lanes");
+
 // --- Clear lanes ------------------------------------------------------------
 app.click("#clear-lanes");
 check("Clear lanes empties the table", lanes(), 0);
@@ -129,6 +179,27 @@ tick("EcoRI");
 check("EcoRI does not warn", app.$("#feature-warning").hasAttribute("hidden"), true);
 app.click("#clear-sel");
 
+// --- Cut a feature out -------------------------------------------------------
+check("the excise row is shown on annotated DNA", app.$("#excise-row").hasAttribute("hidden"), false);
+const targets = app.$$("#excise-feature option").map((o) => o.textContent);
+check("targets are named genes, not every annotation",
+  targets.map((t) => t.split(" · ")[0]), ["tet", "ROP protein", "bla"]);
+// pBR322 annotates rep_origin as a single base — real data, but nothing you can
+// cut out, and it appeared in the picker until a minimum span was required.
+check("a 1 bp feature is not offered as excisable",
+  targets.some((t) => t.startsWith("rep_origin")), false);
+
+app.set("#excise-feature", String(targets.findIndex((t) => t.startsWith("tet"))));
+app.click("#excise-go");
+check("excising tet replaces the lanes with the options", lanes(), 3);
+check("the best option is named in the note",
+  app.$("#suggest-note").textContent,
+  "AvaI + HindIII cuts tet out in a 1,396 bp fragment — 56 bp upstream and 149 bp downstream come with it.");
+check("the note is visible", app.$("#suggest-note").hasAttribute("hidden"), false);
+check("the first lane is the best option",
+  laneNames()[0], "AvaI + HindIII");
+app.click("#clear-lanes");
+
 // --- Import status belongs to the loaded sequence ----------------------------
 // It used to persist, so a receipt for the previous sequence sat under the new
 // one's own line, naming a different molecule.
@@ -139,14 +210,6 @@ app.click(pUC19);
 check("loading a sequence clears the previous receipt", app.$("#import-status").textContent, "");
 check("and the metadata line names the new one",
   app.$("#dna-meta").textContent.includes("pUC19"), true);
-
-// --- `hidden` is honoured ----------------------------------------------------
-// An author `display: flex` rule beat the UA stylesheet, so [hidden] elements
-// stayed visible until a global override was added. The attribute is the
-// contract the JS relies on; assert the elements that use it agree.
-for (const id of ["#feature-warning", "#buffer-warning", "#ends-info", "#suggest-note"]) {
-  check(`${id} starts hidden`, app.$(id).hasAttribute("hidden"), true);
-}
 
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

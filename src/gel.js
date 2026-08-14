@@ -200,6 +200,33 @@ export function renderGel(canvas, lanes, opts) {
     return trackTop + t * trackH;
   };
 
+  // Lane captions are centred above their lane and collide once the lane is
+  // narrower than the text — reachable on a laptop since the three-column
+  // layout, not just on a phone. Three steps, cheapest first: shrink the font,
+  // then stagger onto two rows (which doubles the room a caption has before it
+  // meets its same-row neighbour), then truncate to what actually fits. The old
+  // fixed 18-character cut did none of this: it truncated "EcoRI + HindIII"
+  // never, and let it overlap at any width.
+  const CAPTION_SIZES = [11, 10, 9];
+  const captionWidth = (text, size) => {
+    ctx.font = `${size}px system-ui, sans-serif`;
+    return ctx.measureText(text).width;
+  };
+  const fitCaption = (text, room) => {
+    for (const size of CAPTION_SIZES) {
+      if (captionWidth(text, size) <= room) return { text, size };
+    }
+    const size = CAPTION_SIZES[CAPTION_SIZES.length - 1];
+    let cut = text;
+    while (cut.length > 1 && captionWidth(cut + "…", size) > room) cut = cut.slice(0, -1);
+    return { text: cut + "…", size };
+  };
+  // Staggering is all-or-nothing: alternating only some lanes reads as an
+  // alignment bug rather than a layout.
+  const smallest = CAPTION_SIZES[CAPTION_SIZES.length - 1];
+  const stagger = allLanes.slice(1)
+    .some((l) => captionWidth(l.label, smallest) > laneW - 6);
+
   allLanes.forEach((lane, i) => {
     const x = LANE_LEFT + (i + 0.5) * laneW;
 
@@ -210,10 +237,14 @@ export function renderGel(canvas, lanes, opts) {
     // label
     ctx.save();
     ctx.fillStyle = ink(lane.ladder ? GEL.ladderLabel : GEL.laneLabel);
-    ctx.font = "11px system-ui, sans-serif";
     ctx.textAlign = "center";
-    const label = lane.label.length > 18 ? lane.label.slice(0, 17) + "…" : lane.label;
-    ctx.fillText(label, x, lane.ladder ? 18 : 22);
+    // The ladder sits alone left of the divider, so it never staggers and only
+    // ever competes with itself.
+    const room = lane.ladder || !stagger ? laneW - 6 : 2 * laneW - 10;
+    const caption = fitCaption(lane.label, room);
+    ctx.font = `${caption.size}px system-ui, sans-serif`;
+    const y = lane.ladder ? 18 : stagger ? (i % 2 ? 16 : 27) : 22;
+    ctx.fillText(caption.text, x, y);
     if (lane.ladder) {
       // Spell out that this lane is the reference ruler, not a digest.
       ctx.fillStyle = ink(GEL.ladderLabel, 0.85);
