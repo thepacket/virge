@@ -202,6 +202,44 @@ so the reaction-compatibility check currently covers temperature only. Confirm
 buffer choice against your supplier's chart. See [BACKLOG.md](BACKLOG.md#1-buffer-activity-tables--full-double-digest-feasibility)
 for what it would take to finish.
 
+### AI assistant
+A chat panel at the bottom of the left pane, backed by the Claude API
+(`claude-opus-5`). It answers questions about the loaded DNA and **operates the
+app through tools** rather than only describing what to do — it can read the
+current state, search the enzyme catalog with live cut counts, preview a digest,
+load a sequence, add lanes, and adjust the gel and imaging controls.
+
+Ask *"set up a digest that separates the resistance genes"* on pBR322 and it
+checks the fragment annotations, then adds an EcoRV + PvuII lane splitting `bla`
+from `tet`.
+
+**Setup.** The assistant needs an API key:
+
+```bash
+export ANTHROPIC_API_KEY=sk-ant-...
+npm run dev
+```
+
+Without one, the panel says so and stays disabled — nothing else in VIRGE is
+affected.
+
+**The key never reaches the browser.** This repository is public and the app is
+static, so a key in client code would be committed and served to every visitor.
+Instead `server/assistant-proxy.js` is a Vite dev-server middleware holding the
+key server-side; the browser only ever talks to its own origin at
+`/api/assistant`. `.env` is gitignored, and the model, system prompt and tool
+schemas live server-side so the endpoint can't be driven as a relay for
+arbitrary prompts.
+
+The tool-use loop runs in the browser, because the tools operate the live app.
+Refusals are handled before reading content, server-side fallbacks are requested
+by default (degrading gracefully if the account lacks the beta), and the stable
+system prompt plus tool schemas are cached while the volatile state snapshot
+rides after the cache breakpoint.
+
+**Note:** a production `vite build` has no dev server and therefore no proxy —
+the assistant reports itself unavailable unless you host an equivalent endpoint.
+
 ### Configuration library
 Save the current setup (DNA, lanes, gel settings, methylation context) by name
 in localStorage; alphabetical listing, one-click load, two-click delete, and
@@ -224,6 +262,9 @@ pasted sequence embed it, so they stay portable.
 - `src/suggest.js` — scores digests for band count and spread
 - `src/gel.js` — canvas gel renderer
 - `src/main.js` — UI state, config library, wiring
+- `src/assistant.js` — AI assistant: browser-side tool loop and chat UI
+- `server/assistant-proxy.js` — Vite middleware holding the API key server-side
+- `server/assistant-config.js` — assistant system prompt and tool schemas
 
 ## Contributing
 

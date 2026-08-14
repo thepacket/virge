@@ -2,3 +2,5 @@ node_modules/
 dist/
 data-src/
 .claude/
+.env
+.env.local

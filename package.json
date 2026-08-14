@@ -16,6 +16,7 @@
   "license": "ISC",
   "type": "module",
   "devDependencies": {
+    "@anthropic-ai/sdk": "^0.117.1",
     "vite": "^8.2.1"
   }
 }

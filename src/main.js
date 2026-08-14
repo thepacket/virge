@@ -5,6 +5,7 @@ import { digest, findCuts } from "./digest.js";
 import { suggestDigests } from "./suggest.js";
 import { renderGel } from "./gel.js";
 import { parseAny, sequenceStats, featuresInRange } from "./genbank.js";
+import { initAssistant, registerAssistantApp } from "./assistant.js";
 
 const $ = (sel) => document.querySelector(sel);
 
@@ -807,9 +808,74 @@ function initSections() {
   }
 }
 
+// ---------- API surface the AI assistant's tools drive ----------
+// Exposed deliberately rather than letting the assistant reach into internals,
+// so every action it takes goes through the same paths the UI uses.
+registerAssistantApp({
+  getState: () => ({
+    dnaName: state.dnaName, seq: state.seq, circular: state.circular,
+    features: state.features, methylation: state.methylation,
+    gelPct: state.gelPct, ladderKey: state.ladderKey,
+    exposure: state.exposure, contrast: state.contrast,
+  }),
+
+  cutCount: (enzyme) => cutCountFor(enzyme),
+
+  laneSummaries: () =>
+    computedLanes().map((l) => ({
+      enzymes: l.label,
+      cuts: l.cuts.length,
+      fragment_count: l.fragments.length,
+      fragments: l.fragments.slice(0, 30).map((f) => f.size),
+      uncut: l.uncut,
+      blocked_sites: l.blocked,
+      warning: l.warning || undefined,
+    })),
+
+  previewDigest: (enzymes) => {
+    const d = digest(state.seq, enzymes, state.circular, { methylation: state.methylation });
+    const annotate = state.features.length > 0;
+    return {
+      enzymes: enzymes.map((e) => e.name).join(" + "),
+      cuts: d.cuts.length,
+      uncut: d.uncut,
+      fragment_count: d.fragments.length,
+      fragments: d.fragments.slice(0, 40).map((f) =>
+        annotate
+          ? { size: f.size, carries: fragmentFeatures(f).slice(0, 6) }
+          : { size: f.size }),
+      truncated: d.fragments.length > 40,
+      blocked_by_methylation: d.blocked,
+      temperature_warning: bufferWarning(enzymes) || undefined,
+    };
+  },
+
+  addLane: (names) => { state.lanes.push({ enzymeNames: [...names] }); renderAll(); },
+  clearLanes: () => { state.lanes = []; renderAll(); },
+
+  loadSample: async (key) => {
+    const s = SAMPLES[key];
+    openGroups.add(s.group);
+    if (s.lazy) await loadLazySample(key, s);
+    else loadDna(s.name, s.sequence, s.topology === "circular", key, s.features || []);
+  },
+
+  setGel: (opts) => {
+    const applied = {};
+    if (opts.agarose != null) { state.gelPct = opts.agarose; $("#gel-pct").value = String(opts.agarose); applied.agarose = opts.agarose; }
+    if (opts.ladder) { state.ladderKey = opts.ladder; $("#ladder-select").value = opts.ladder; applied.ladder = opts.ladder; }
+    if (opts.methylation) { state.methylation = opts.methylation; $("#methylation").value = opts.methylation; applied.methylation = opts.methylation; }
+    if (opts.exposure_stops != null) { setExposure(Math.max(-2, Math.min(2.5, opts.exposure_stops)), { redraw: false }); applied.exposure_stops = opts.exposure_stops; }
+    if (opts.contrast != null) { setContrast(Math.max(0.25, Math.min(1.6, opts.contrast)), { redraw: false }); applied.contrast = opts.contrast; }
+    renderAll();
+    return applied;
+  },
+});
+
 setExposure(0, { redraw: false });
 setContrast(0.5, { redraw: false });
 initSections();
+initAssistant();
 initSamples();
 renderLibrary();
 

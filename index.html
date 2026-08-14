@@ -129,6 +129,23 @@
         <div id="lib-status" class="hint" role="status"></div>
         <div id="config-list" class="config-list"></div>
       </details>
+
+      <details class="card section" id="sec-assistant" open>
+        <summary class="card-head"><h2>✨ Assistant</h2></summary>
+        <div id="chat-status" class="warning" hidden></div>
+        <div id="chat-log" class="chat-log">
+          <div class="chat-msg assistant">Ask me about the loaded DNA, or tell me what to set up — I can load sequences, pick enzymes and add lanes for you.</div>
+          <div class="chat-suggestions">
+            <button type="button" class="chat-suggestion">Which enzymes cut this DNA exactly once?</button>
+            <button type="button" class="chat-suggestion">Set up a digest that separates the resistance genes</button>
+            <button type="button" class="chat-suggestion">Can I clone into this with BamHI and BglII?</button>
+          </div>
+        </div>
+        <form id="chat-form" class="chat-form">
+          <textarea id="chat-input" rows="2" placeholder="Ask, or tell me what to set up…" spellcheck="false"></textarea>
+          <button type="submit" id="chat-send" class="btn">Send</button>
+        </form>
+      </details>
     </aside>
 
     <!-- Right: gel + results -->
