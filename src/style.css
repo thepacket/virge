@@ -139,7 +139,6 @@ textarea { width: 100%; padding: 8px; resize: vertical; font-family: ui-monospac
   border-color: var(--accent);
   color: var(--accent);
   font-weight: 600;
-  align-self: center;    /* never stretch to fill a flex row */
 }
 .btn:hover:not(:disabled) { background: #22c55e4d; }
 /* `small` is now layout-only: it right-aligns a button in a flex header. */
@@ -147,7 +146,10 @@ textarea { width: 100%; padding: 8px; resize: vertical; font-family: ui-monospac
 .btn:disabled { opacity: 0.4; cursor: default; border-color: var(--border); color: var(--muted); background: transparent; }
 #add-lane { flex: 1; text-align: left; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
-.row { display: flex; gap: 10px; align-items: center; margin-top: 10px; flex-wrap: wrap; }
+/* Bottom-aligned: a control row mixes stacked labels (caption above a select,
+   so ~52px tall) with plain buttons and inputs. Centring made the button float
+   mid-row instead of lining up with the selects beside it. */
+.row { display: flex; gap: 10px; align-items: flex-end; margin-top: 10px; flex-wrap: wrap; }
 .row label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--muted); }
 label.inline { flex-direction: row; align-items: center; gap: 5px; color: var(--text); }
 
@@ -188,6 +190,9 @@ label.inline { flex-direction: row; align-items: center; gap: 5px; color: var(--
 #config-name { flex: 1; padding: 7px 10px; font-size: 13px; background: var(--panel); border: 1px solid var(--border); border-radius: 7px; color: var(--text); }
 .config-list { margin-top: 10px; }
 .config-row { display: flex; gap: 6px; align-items: stretch; margin-bottom: 4px; }
+/* These rows stretch their children by design (the load button is a tall card),
+   so the delete button opts out rather than being stretched with it. */
+.config-row > .btn, .dna-line > .btn { align-self: center; }
 .config-load {
   flex: 1;
   display: flex;
