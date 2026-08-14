@@ -283,6 +283,20 @@ Bundled data is not covered by that licence and keeps its own terms: enzyme
 definitions derive from [REBASE](http://rebase.neb.com), Copyright (c) Dr.
 Richard J. Roberts, free for academic use; sequences come from NCBI GenBank.
 
+## Theme
+
+Colours come from the `skew-t` project — near-black surfaces with a cyan accent
+— mapped onto this app's variables in the `:root` block of `src/style.css`
+(`bg-void`→`bg`, `bg-panel`→`card`, `bg-raised`→`panel`, `bg-input`→`input`,
+`line`→`border`, `text-faint`→`muted`). Semantic colours (`--warn`, `--error`,
+`--ok`) come from the same palette, and the previously hardcoded reds, ambers and
+greens now reference them — so retheming means editing that one block.
+
+**The gel keeps its own colours deliberately.** Bands stay green, the ladder blue
+and an uncut plasmid orange, because those encode meaning — green is your digest,
+blue is the size standard, orange is uncut DNA — and recolouring them to match
+the chrome would lose more than it gained.
+
 ## Notes
 
 The REBASE source file is fetched at build time rather than redistributed here.
