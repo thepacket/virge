@@ -13,9 +13,8 @@
 // duplicates are detected by the cuts they produce rather than by name.
 import { ENZYMES, lookup, bufferWarning } from "./enzymes.js";
 import { findCuts, fragmentsFromCuts } from "./digest.js";
+import { featuresCutBy } from "./genbank.js";
 
-// Cutting through one of these breaks something the user probably cares about.
-const PROTECTED_FEATURES = new Set(["CDS", "gene", "rep_origin"]);
 
 /**
  * What the suggestions are for. `bands` is the band count being aimed at and
@@ -44,16 +43,13 @@ const PURPOSES = {
 
 export const SUGGEST_PURPOSES = Object.entries(PURPOSES).map(([id, p]) => ({ id, label: p.label }));
 
-/** Fraction of cuts that land inside a feature worth protecting. */
+/** Fraction of cuts that land inside a feature worth protecting. A cut inside
+ *  two overlapping features is still one bad cut, so the positions are counted
+ *  once rather than once per feature. */
 function cutsInsideFeatures(cuts, features) {
-  if (!features?.length || !cuts.length) return 0;
-  const guarded = features.filter((f) => PROTECTED_FEATURES.has(f.type));
-  if (!guarded.length) return 0;
-  let hits = 0;
-  for (const c of cuts) {
-    if (guarded.some((f) => f.segments.some((s) => c >= s.start && c < s.end))) hits++;
-  }
-  return hits / cuts.length;
+  if (!cuts.length) return 0;
+  const bad = new Set(featuresCutBy(cuts, features).flatMap((h) => h.cuts));
+  return bad.size / cuts.length;
 }
 
 function score({ sizes, cuts, enzymes, features, minBp, maxBp, purpose }) {

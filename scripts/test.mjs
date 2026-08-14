@@ -2,9 +2,9 @@
 // Expected values are published restriction maps, not outputs of this code.
 import { SAMPLES } from "../src/data/samples.js";
 import { lookup, ENZYMES, overhangSignature, compatibleEnds, bufferWarning } from "../src/enzymes.js";
-import { digest, findSites } from "../src/digest.js";
+import { digest, findSites, findCuts } from "../src/digest.js";
 import { suggestDigests } from "../src/suggest.js";
-import { parseAny, sequenceStats, ParseError } from "../src/genbank.js";
+import { parseAny, sequenceStats, ParseError, featuresCutBy } from "../src/genbank.js";
 import { LADDERS, PFGE_RUNS, laddersFor, sizeLabel, sizeWindow } from "../src/gel.js";
 
 let pass = 0, fail = 0;
@@ -197,6 +197,55 @@ check("every enzyme has cut coordinates",
   ENZYMES.every((e) => Number.isInteger(e.cutTop) && Number.isInteger(e.cutBottom)), true);
 check("every enzyme has a valid site",
   ENZYMES.every((e) => /^[ACGTRYSWKMBDHVN]+$/.test(e.site)), true);
+
+// --- Cuts landing inside annotated features ---------------------------------
+// One definition, used by both Suggest's scoring and the enzyme panel's warning,
+// so the automated and the hand-picked path cannot disagree about what counts.
+const pbr = SAMPLES.pBR322;
+const cutsOf = (name) => findCuts(pbr.sequence, lookup(name), true, "dam_dcm");
+const hitLabels = (name) => featuresCutBy(cutsOf(name), pbr.features).map((h) => h.label).sort();
+
+// EcoRV cuts pBR322 once, inside the tet resistance gene — the textbook reason
+// EcoRV is the classic insertional-inactivation site on this plasmid.
+check("EcoRV cuts pBR322 once", cutsOf("EcoRV").length, 1);
+check("EcoRV's cut lands inside tet", hitLabels("EcoRV").includes("tet"), true);
+
+// EcoRI cuts pBR322 once too, but at position 4359 — outside every gene, which
+// is why it is the standard cloning site here. Same shape of input, opposite
+// answer: a warning that fires for both would be worthless.
+check("EcoRI cuts pBR322 once", cutsOf("EcoRI").length, 1);
+check("EcoRI's cut hits no annotated feature", hitLabels("EcoRI"), []);
+
+// pBR322 annotates tet as both a `gene` and a `CDS` over the same span, so one
+// EcoRV cut matches two features. Anything reporting a count has to say one cut
+// and one gene, not two of each.
+const ecorvHits = featuresCutBy(cutsOf("EcoRV"), pbr.features);
+check("one EcoRV cut matches two tet annotations", ecorvHits.length, 2);
+check("distinct labels collapse to one gene",
+  new Set(ecorvHits.map((h) => h.label)).size, 1);
+check("distinct cut positions collapse to one cut",
+  new Set(ecorvHits.flatMap((h) => h.cuts)).size, 1);
+
+check("no features means no hits", featuresCutBy([100, 200], []), []);
+check("no cuts means no hits", featuresCutBy([], pbr.features), []);
+
+// Only CDS / gene / rep_origin are protected; a source or misc feature is not
+// something a cut through destroys.
+check("unprotected feature types are ignored",
+  featuresCutBy([50], [{ type: "misc_feature", label: "x", segments: [{ start: 0, end: 100 }] }]), []);
+check("a CDS is protected",
+  featuresCutBy([50], [{ type: "CDS", label: "y", segments: [{ start: 0, end: 100 }] }])
+    .map((h) => h.label), ["y"]);
+
+// A cut inside two overlapping genes is still one bad cut, or the fraction
+// Suggest scores on could exceed 1.
+const overlapping = [
+  { type: "CDS", label: "a", segments: [{ start: 0, end: 100 }] },
+  { type: "gene", label: "b", segments: [{ start: 40, end: 120 }] },
+];
+check("overlapping features both reported", featuresCutBy([50], overlapping).map((h) => h.label), ["a", "b"]);
+check("but the cut is counted once",
+  new Set(featuresCutBy([50], overlapping).flatMap((h) => h.cuts)).size, 1);
 
 // --- Pulsed-field mode ------------------------------------------------------
 // The λ PFG marker is a concatemer series, so every rung must be an exact

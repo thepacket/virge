@@ -168,6 +168,28 @@ export function sequenceStats(seq) {
   };
 }
 
+// Cutting through one of these breaks something the user probably cares about.
+export const PROTECTED_FEATURES = new Set(["CDS", "gene", "rep_origin"]);
+
+/**
+ * Which protected features each cut position lands inside.
+ *
+ * Returns `[{ label, type, cuts: [pos, ...] }]`, one entry per feature hit,
+ * in sequence order. Suggest reduces this to a fraction for scoring while the
+ * enzyme panel names the genes; both go through here so the automated and the
+ * manual path can never disagree about what counts as cutting a gene.
+ */
+export function featuresCutBy(cuts, features) {
+  if (!features?.length || !cuts.length) return [];
+  const hits = [];
+  for (const f of features) {
+    if (!PROTECTED_FEATURES.has(f.type)) continue;
+    const inside = cuts.filter((c) => f.segments.some((s) => c >= s.start && c < s.end));
+    if (inside.length) hits.push({ label: f.label, type: f.type, cuts: inside });
+  }
+  return hits.sort((a, b) => a.cuts[0] - b.cuts[0]);
+}
+
 /** Features overlapping a fragment, for circular-aware fragment annotation. */
 export function featuresInRange(features, start, end, seqLen, circular) {
   const spans = end > start ? [[start, end]] : [[start, seqLen], [0, end]];

@@ -4,7 +4,7 @@ import { ENZYMES, lookup, endType, siteWithCut, bufferWarning,
 import { digest, findCuts } from "./digest.js";
 import { suggestDigests } from "./suggest.js";
 import { renderGel, LADDERS, PFGE_RUNS, laddersFor } from "./gel.js";
-import { parseAny, sequenceStats, featuresInRange } from "./genbank.js";
+import { parseAny, sequenceStats, featuresInRange, featuresCutBy } from "./genbank.js";
 import { initAssistant, registerAssistantApp } from "./assistant.js";
 
 const $ = (sel) => document.querySelector(sel);
@@ -387,6 +387,43 @@ $("#tier-filter").addEventListener("change", (e) => { state.tier = +e.target.val
 $("#cut-filter").addEventListener("change", (e) => { state.cutFilter = e.target.value; renderEnzymes(); });
 $("#methylation").addEventListener("change", (e) => { state.methylation = e.target.value; renderAll(); });
 
+/**
+ * "Will this destroy my insert?" — the question a bench scientist asks before
+ * committing to a digest.
+ *
+ * Suggest has always avoided cutting through genes when picking a cloning
+ * digest, but hand-picking the same enzymes said nothing, on the same DNA with
+ * the same annotations already loaded. This closes that asymmetry; both paths
+ * go through featuresCutBy(), so they cannot disagree about what counts.
+ *
+ * Silent when the DNA carries no annotations, rather than implying safety it
+ * cannot check.
+ */
+function renderFeatureWarning(chosen) {
+  const box = $("#feature-warning");
+  if (!chosen.length || !state.features.length) { box.hidden = true; box.textContent = ""; return; }
+
+  // findCuts is per-enzyme; the selection is a single tube, so pool them.
+  const cuts = [...new Set(chosen.flatMap((e) =>
+    findCuts(state.seq, e, state.circular, state.methylation)))].sort((a, b) => a - b);
+  const hits = featuresCutBy(cuts, state.features);
+  if (!hits.length) { box.hidden = true; box.textContent = ""; return; }
+
+  // Both counts are over distinct things, because GenBank routinely annotates
+  // one gene twice — pBR322 carries `tet` as both a `gene` and a `CDS`, so a
+  // single EcoRV cut matches two features. Summing them claimed "2 cuts" on a
+  // plasmid EcoRV cuts once.
+  const named = [...new Set(hits.map((h) => h.label).filter(Boolean))];
+  const positions = new Set(hits.flatMap((h) => h.cuts));
+  const shown = named.slice(0, 4).join(", ");
+  const rest = named.length > 4 ? ` +${named.length - 4} more` : "";
+  const n = positions.size;
+  box.textContent =
+    `${n} cut${n === 1 ? " lands" : "s land"} inside ${named.length} annotated ` +
+    `feature${named.length === 1 ? "" : "s"}${shown ? `: ${shown}${rest}` : ""}.`;
+  box.hidden = false;
+}
+
 // Keep the selection-dependent buttons honest about what they will do.
 function renderSelectionState() {
   const n = state.selected.size;
@@ -399,6 +436,8 @@ function renderSelectionState() {
   const warn = bufferWarning(chosen);
   $("#buffer-warning").textContent = warn || "";
   $("#buffer-warning").hidden = !warn;
+
+  renderFeatureWarning(chosen);
 
   // Sticky ends: what each enzyme leaves, and what it will ligate to.
   const box = $("#ends-info");
