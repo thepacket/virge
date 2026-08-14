@@ -20,7 +20,7 @@ shared key to drain.
 | `nginx.conf` | Caching, gzip, single-page fallback, `/healthz` |
 | `security-headers.conf` | CSP and the other response headers, included per-location |
 | `fly.toml` | App name, region, machine size, health check |
-| `.dockerignore` | Keeps `node_modules`, `dist`, `.git`, `data-src` and `*.md` out of the build context |
+| `.dockerignore` | Keeps `node_modules`, `dist`, `.git`, `data-src`, `docs/` and `*.md` out of the build context |
 
 ## First deploy
 
@@ -52,18 +52,19 @@ request after an idle period pays a wake-up of roughly a second. Set
 this. The work VIRGE does — site searching, fragment assembly, canvas
 rendering — happens in the visitor's browser, not here.
 
-**The bundle is one large chunk.** About 710 kB of JavaScript, most of it the
-bundled enzyme table and sample sequences. It is served once per cold visit and
-then cached for a year. Sequences too large to bundle are marked lazy and
+**The bundle is one large chunk.** About 1,019 kB of JavaScript — the enzyme
+table, the bundled sample sequences, the Anthropic SDK, and marked + DOMPurify
++ KaTeX for rendering the assistant's replies. It is served once per cold visit
+and then cached for a year. Sequences too large to bundle are marked lazy and
 fetched from NCBI by the browser, so their bandwidth is NCBI's rather than this
 deployment's.
 
-**Fly's edge compresses, not nginx.** In production the bundle arrives as
-197 kB with brotli/zstd — better than the 228 kB nginx's own `gzip on` produces,
-and it wins because the edge re-encodes. The nginx directive is not redundant
-(it covers a direct hit on the container, which is how the image was smoke
-tested), but it is not what visitors get. A `curl -I` will show neither, because
-Fly does not compress a HEAD response: measure with a real GET.
+**Fly's edge compresses, not nginx.** Measured against the live deployment:
+1,019 kB uncompressed, 449 kB with gzip, **307 kB** with brotli/zstd. The edge
+re-encodes, so the nginx `gzip on` directive is not what visitors get — it is
+not redundant either, since it covers a direct hit on the container, which is
+how the image is smoke tested. A `curl -I` shows no `content-encoding` at all,
+because Fly does not compress a HEAD response: measure with a real GET.
 
 ## Caching
 
@@ -102,6 +103,13 @@ external module and a linked stylesheet, and the app sets no style attributes.
 Adding an inline handler or a `style="…"` attribute would break in production
 and pass in dev — the same asymmetry, without a check to catch it.
 
+**`style-src` is load-bearing for the assistant.** KaTeX's default HTML output
+writes inline `style` attributes — four on `x^2` alone — which this policy
+blocks. `src/markdown.js` therefore renders maths to MathML, which writes none
+and needs no webfonts. Switching that `output` setting back would appear to work
+in dev and render broken equations in production, and it would also drag ~1 MB
+of KaTeX fonts into the bundle.
+
 ## Verified
 
 Both against a local container and against the live deployment, when this was
@@ -111,7 +119,7 @@ written:
 - CSP, `X-Frame-Options`, `X-Content-Type-Options` and `Referrer-Policy`
   present on the shell, on a hashed asset and on a fallback path
 - `Cache-Control: no-cache` on the shell, `immutable` on `/assets/*`
-- compression active — 228 kB from nginx directly, 197 kB through Fly's edge
+- compression active — 449 kB gzip, 307 kB brotli/zstd through Fly's edge
 - the app loaded and rendered with no CSP violations in the console
 - `NC_005816` fetched from NCBI through the app under the production CSP —
   9,609 bp, 20 features, the correct pPCP1 record

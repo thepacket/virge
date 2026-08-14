@@ -46,9 +46,10 @@ their **annotations** (844 features) rather than bare sequence:
 
 Sequences up to 62 kb are bundled; larger records (up to the 5.5 Mb E. coli
 O157:H7 genome) carry metadata only and are fetched from NCBI when selected,
-then cached for the session. This keeps the bundle to ~682 kB (179 kB gzipped, most of it sequence data plus the Anthropic SDK) while making whole
-genomes usable — digesting E. coli K-12 with NotI yields 23 megabase-scale
-fragments, the real pulsed-field experiment, in about 60 ms.
+then cached for the session. That keeps whole genomes usable without carrying
+them in the bundle — digesting E. coli K-12 with NotI yields 23 megabase-scale
+fragments, the real pulsed-field experiment, in about 60 ms. See
+[DEPLOY.md](DEPLOY.md) for what the bundle actually weighs.
 
 Every accession was verified against NCBI before inclusion, and topology comes
 from NCBI rather than being assumed — with documented corrections where the
@@ -413,9 +414,9 @@ pasted sequence embed it, so they stay portable.
   GenBank and parses their annotations
 - `src/genbank.js` — GenBank/FASTA parsers, shared by the build script and the
   browser so the two import paths cannot drift apart
-- `scripts/test.mjs` — science regression tests (92), checked against published
+- `scripts/test.mjs` — science regression tests (152), checked against published
   restriction maps rather than this code's own output
-- `scripts/test-dom.mjs` + `scripts/dom-harness.mjs` — UI regression tests (31).
+- `scripts/test-dom.mjs` + `scripts/dom-harness.mjs` — UI regression tests (60).
   The harness parses the real `index.html`, installs the browser globals, and
   records canvas drawing instead of rasterising it, so a test can ask what was
   actually drawn. Every check corresponds to a bug that shipped: pulsed-field
@@ -427,8 +428,10 @@ pasted sequence embed it, so they stay portable.
 - `src/data/samples.js` — GenBank sequences with group metadata
 - `src/enzymes.js` — catalog helpers (overhangs, display, buffer checks)
 - `src/digest.js` — both-strand site finding, methylation, fragments
-- `src/suggest.js` — scores digests for band count and spread
-- `src/gel.js` — canvas gel renderer
+- `src/suggest.js` — purpose-driven digest scoring, and `excisionOptions()` for
+  cutting a named feature out in one piece
+- `src/gel.js` — canvas gel renderer: constant-field and pulsed-field (CHEF)
+  migration, ladders, compression zones, exposure and contrast
 - `src/main.js` — UI state, config library, wiring
 - `src/assistant.js` — AI assistant: key handling, tool loop, chat UI
 - `src/assistant-config.js` — assistant system prompt and tool schemas
