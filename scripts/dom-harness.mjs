@@ -120,6 +120,13 @@ export async function loadApp() {
   // move the selection, and main.js relies on that, so make it behave.
   patchSelectValue(window, document);
   patchDetailsOpen(document);
+  // linkedom leaves compatMode undefined, which KaTeX reads as quirks mode and
+  // warns about on every run. Both index.html and the built dist/index.html do
+  // carry a doctype, so the warning is a harness artefact — and test output
+  // people learn to scroll past is test output they stop reading.
+  if (!document.compatMode) {
+    Object.defineProperty(document, "compatMode", { value: "CSS1Compat", configurable: true });
+  }
 
   Object.assign(globalThis, {
     window,

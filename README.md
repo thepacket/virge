@@ -352,6 +352,22 @@ exchange never finishes on a different model than it started on. Since you are
 spending your own credit, the tradeoff is yours to make — a "which enzymes cut
 this once?" lookup does not need Opus.
 
+**Replies render as Markdown and LaTeX** — headings, lists, tables, code blocks
+and maths — while your own turn stays plain text.
+
+Two decisions worth knowing. The reply is **sanitised, always**: the model has
+just read a GenBank file you dropped in, whose labels and definitions are
+someone else's text, so `<script>`, event handlers, `javascript:` URLs, frames,
+forms and `style` attributes are stripped before the HTML reaches the page. And
+maths renders to **MathML rather than KaTeX's default HTML**, because that
+output writes inline `style` attributes — four on `x^2` alone — which VIRGE's
+`style-src 'self'` policy blocks. MathML emits none, needs no webfonts, and
+browsers render it natively, so the strict CSP stands and ~1 MB of KaTeX font
+files never enters the bundle.
+
+If no working sanitiser is available the reply is escaped and shown verbatim
+rather than rendered — the failure mode is ugly, not unsafe.
+
 **Clear** (above Send) drops the conversation the assistant remembers, so the
 next question starts from nothing — useful when you switch topic and don't want
 earlier turns steering the answer, or to stop paying to resend a long history.
@@ -406,6 +422,8 @@ pasted sequence embed it, so they stay portable.
 - `src/main.js` — UI state, config library, wiring
 - `src/assistant.js` — AI assistant: key handling, tool loop, chat UI
 - `src/assistant-config.js` — assistant system prompt and tool schemas
+- `src/markdown.js` — Markdown + LaTeX rendering for replies, sanitised, with
+  maths as MathML so the CSP needs no `'unsafe-inline'`
 - `src/dna-search.js` — curated name aliases, the "deliberately absent, and
   here is why" list, and the NCBI candidate search
 - `scripts/check-csp.mjs` — fails the build if the source fetches a host the

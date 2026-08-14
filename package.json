@@ -17,11 +17,15 @@
   "license": "ISC",
   "type": "module",
   "devDependencies": {
+    "jsdom": "^29.1.1",
     "linkedom": "^0.18.13",
     "vite": "^8.2.1"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.117.1"
+    "@anthropic-ai/sdk": "^0.117.1",
+    "dompurify": "^3.4.13",
+    "katex": "^0.18.4",
+    "marked": "^18.0.9"
   },
   "scripts:test:dom": "node scripts/test-dom.mjs"
 }

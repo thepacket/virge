@@ -20,6 +20,7 @@ import { SAMPLES, GROUPS } from "./data/samples.js";
 import { ENZYMES, lookup, endType, siteWithCut, bufferWarning,
          overhangSignature, compatibleEnds } from "./enzymes.js";
 import { digest } from "./digest.js";
+import { renderMarkdown } from "./markdown.js";
 
 const $ = (sel) => document.querySelector(sel);
 const MAX_TOOL_ROUNDS = 8;
@@ -176,7 +177,11 @@ let busy = false;
 function bubble(role, text, cls = "") {
   const el = document.createElement("div");
   el.className = `chat-msg ${role}${cls ? " " + cls : ""}`;
-  el.textContent = text;
+  // Only the model's own replies are rendered as markdown. The user's turn is
+  // echoed as plain text: there is nothing to gain from formatting your own
+  // input, and it keeps one more string out of the HTML path.
+  if (role === "assistant" && !cls) el.innerHTML = renderMarkdown(text);
+  else el.textContent = text;
   $("#chat-log").appendChild(el);
   $("#chat-log").scrollTop = $("#chat-log").scrollHeight;
   return el;
