@@ -17,6 +17,10 @@
 
 * { box-sizing: border-box; }
 
+/* An author `display` rule beats the UA stylesheet's `[hidden] {display:none}`,
+   so any flex/grid element with the hidden attribute would stay visible. */
+[hidden] { display: none !important; }
+
 /* Scrollbars styled to the panel surfaces. Firefox uses the two-value
    scrollbar-color; WebKit/Blink use the pseudo-elements below. */
 * {
@@ -342,6 +346,26 @@ details summary { cursor: pointer; color: var(--muted); font-size: 13px; margin-
 }
 
 /* ---------- AI assistant ---------- */
+.key-setup .row { margin-top: 0; }
+#chat-key-input {
+  flex: 1; min-width: 0; padding: 7px 9px; font: inherit; font-size: 12.5px;
+  color: var(--text); background: var(--panel);
+  border: 1px solid var(--border); border-radius: 8px;
+}
+#chat-key-input:focus { outline: none; border-color: var(--accent); }
+.key-setup .hint { margin-top: 7px; line-height: 1.5; }
+.key-setup a { color: var(--accent); }
+.key-saved {
+  display: flex; align-items: center; gap: 8px;
+  margin-bottom: 9px; padding-bottom: 9px;
+  border-bottom: 1px solid var(--border);
+}
+.key-saved code {
+  font-family: ui-monospace, monospace; color: var(--accent);
+  background: var(--accent-dim); padding: 1px 5px; border-radius: 4px;
+}
+.key-saved .btn { margin-left: auto; }
+
 .chat-log {
   display: flex; flex-direction: column; gap: 7px;
   max-height: 340px; overflow-y: auto;

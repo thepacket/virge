@@ -1,6 +1,6 @@
 // System prompt and tool schemas for the VIRGE assistant.
-// Kept server-side alongside the proxy so the endpoint's behaviour is fixed
-// rather than caller-supplied.
+// The assistant calls the Claude API directly from the browser using a key the
+// user supplies, so this configuration is bundled with the client.
 
 export const SYSTEM_PROMPT = `You are the assistant built into VIRGE, a virtual restriction digest and gel
 electrophoresis simulator. You help molecular biologists plan and interpret digests, and you can

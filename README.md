@@ -38,7 +38,7 @@ their **annotations** (900 features) rather than bare sequence:
 
 Sequences up to 62 kb are bundled; larger records (up to the 5.5 Mb E. coli
 O157:H7 genome) carry metadata only and are fetched from NCBI when selected,
-then cached for the session. This keeps the app ~550 kB while making whole
+then cached for the session. This keeps the bundle to ~692 kB (182 kB gzipped, most of it sequence data plus the Anthropic SDK) while making whole
 genomes usable — digesting E. coli K-12 with NotI yields 23 megabase-scale
 fragments, the real pulsed-field experiment, in about 60 ms.
 
@@ -213,32 +213,30 @@ Ask *"set up a digest that separates the resistance genes"* on pBR322 and it
 checks the fragment annotations, then adds an EcoRV + PvuII lane splitting `bla`
 from `tet`.
 
-**Setup.** The assistant needs an API key:
+**Setup.** Paste your own Anthropic API key into the panel
+([get one here](https://platform.claude.com/settings/keys)). It is kept in that
+browser's `localStorage` and reused on your next visit; **Forget** clears both
+the key and the conversation. Until a key is entered the panel shows the prompt
+and nothing else in VIRGE is affected.
 
-```bash
-export ANTHROPIC_API_KEY=sk-ant-...
-npm run dev
-```
+There is **no server component** — the browser calls `api.anthropic.com`
+directly, so the assistant works in a static build exactly as it does in dev.
 
-Without one, the panel says so and stays disabled — nothing else in VIRGE is
-affected.
+**Understand the tradeoff before using it.** Holding an API key in a page means
+anything else running in that page — a browser extension, or any script that
+gets injected — can read it. That is why the SDK calls the option
+`dangerouslyAllowBrowser`, and why the API demands an explicit
+`anthropic-dangerous-direct-browser-access` header. It is a reasonable choice for
+a local tool with your own key, and a poor one for a key you can't rotate or a
+shared machine. The panel says as much, shows only the last four characters back
+to you, and never writes the key anywhere but `localStorage`.
 
-**The key never reaches the browser.** This repository is public and the app is
-static, so a key in client code would be committed and served to every visitor.
-Instead `server/assistant-proxy.js` is a Vite dev-server middleware holding the
-key server-side; the browser only ever talks to its own origin at
-`/api/assistant`. `.env` is gitignored, and the model, system prompt and tool
-schemas live server-side so the endpoint can't be driven as a relay for
-arbitrary prompts.
-
-The tool-use loop runs in the browser, because the tools operate the live app.
-Refusals are handled before reading content, server-side fallbacks are requested
-by default (degrading gracefully if the account lacks the beta), and the stable
-system prompt plus tool schemas are cached while the volatile state snapshot
-rides after the cache breakpoint.
-
-**Note:** a production `vite build` has no dev server and therefore no proxy —
-the assistant reports itself unavailable unless you host an equivalent endpoint.
+Implementation notes: the tool-use loop runs in the browser because the tools
+operate the live app, and parallel tool calls return in a single user turn.
+Refusals are checked before reading content, server-side fallbacks are requested
+with graceful degradation if the account lacks the beta, and the stable system
+prompt plus tool schemas are cached while the volatile state snapshot rides after
+the cache breakpoint.
 
 ### Configuration library
 Save the current setup (DNA, lanes, gel settings, methylation context) by name
@@ -262,9 +260,8 @@ pasted sequence embed it, so they stay portable.
 - `src/suggest.js` — scores digests for band count and spread
 - `src/gel.js` — canvas gel renderer
 - `src/main.js` — UI state, config library, wiring
-- `src/assistant.js` — AI assistant: browser-side tool loop and chat UI
-- `server/assistant-proxy.js` — Vite middleware holding the API key server-side
-- `server/assistant-config.js` — assistant system prompt and tool schemas
+- `src/assistant.js` — AI assistant: key handling, tool loop, chat UI
+- `src/assistant-config.js` — assistant system prompt and tool schemas
 
 ## Contributing
 

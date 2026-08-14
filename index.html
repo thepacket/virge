@@ -132,7 +132,26 @@
 
       <details class="card section" id="sec-assistant" open>
         <summary class="card-head"><h2>✨ Assistant</h2></summary>
-        <div id="chat-status" class="warning" hidden></div>
+        <div id="chat-key-setup" class="key-setup">
+          <form id="chat-key-form" class="row">
+            <input type="password" id="chat-key-input" autocomplete="off" spellcheck="false"
+                   placeholder="Anthropic API key (sk-ant-…)" />
+            <button type="submit" class="btn">Save</button>
+          </form>
+          <p class="hint">
+            Kept in this browser only and sent straight to api.anthropic.com — there is no
+            server. Anything else running on this page could read it, so use a key you're
+            willing to rotate, and Forget it on a shared machine.
+            <a href="https://platform.claude.com/settings/keys" target="_blank" rel="noopener">Get a key</a>
+          </p>
+          <div id="chat-key-error" class="warning" hidden></div>
+        </div>
+
+        <div id="chat-key-saved" class="key-saved hint" hidden>
+          <span>Key <code id="chat-key-mask"></code> stored in this browser</span>
+          <button type="button" id="chat-key-forget" class="btn small">Forget</button>
+        </div>
+
         <div id="chat-log" class="chat-log">
           <div class="chat-msg assistant">Ask me about the loaded DNA, or tell me what to set up — I can load sequences, pick enzymes and add lanes for you.</div>
           <div class="chat-suggestions">

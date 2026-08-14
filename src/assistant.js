@@ -1,12 +1,21 @@
 // The AI assistant panel.
 //
-// The tool-use loop runs here rather than on the server, because the tools
-// operate the live app: they read state, load DNA, and add lanes. The server
-// endpoint (/api/assistant) is one stateless turn that holds the API key.
+// The user supplies their own API key through the UI; it is kept in this
+// browser (localStorage) and sent only to api.anthropic.com. There is no
+// server component, so the assistant works in a static build as well as in dev.
 //
-// Flow: send conversation -> get a message back -> if it contains tool_use
-// blocks, run them locally and send the results as the next user turn ->
-// repeat until the model stops calling tools.
+// Calling the API from a browser needs `dangerouslyAllowBrowser` — the SDK
+// then sends the `anthropic-dangerous-direct-browser-access` header the API
+// requires. The name is a real warning, not a formality: a key held in a page
+// is readable by anything else running in that page, so the UI says so and
+// offers a one-click Forget.
+//
+// The tool-use loop runs here because the tools operate the live app: they read
+// state, load DNA, and add lanes. Flow: send conversation -> get a message ->
+// if it contains tool_use blocks, run them and send the results back as one
+// user turn -> repeat until the model stops calling tools.
+import Anthropic from "@anthropic-ai/sdk";
+import { SYSTEM_PROMPT, TOOLS } from "./assistant-config.js";
 import { SAMPLES, GROUPS } from "./data/samples.js";
 import { ENZYMES, lookup, endType, siteWithCut, bufferWarning,
          overhangSignature, compatibleEnds } from "./enzymes.js";
@@ -14,6 +23,9 @@ import { digest } from "./digest.js";
 
 const $ = (sel) => document.querySelector(sel);
 const MAX_TOOL_ROUNDS = 8;
+const MODEL = "claude-opus-5";
+const MAX_TOKENS = 16000;
+const KEY_STORAGE = "virge-anthropic-key";
 
 // Injected by main.js so the assistant can drive the app without importing
 // its internals (which would be circular).
@@ -168,15 +180,95 @@ const TOOL_LABEL = {
   compatible_ends: "checking sticky ends",
 };
 
+// ---------- key handling (browser-local) ----------
+let client = null;
+
+const readKey = () => {
+  try { return localStorage.getItem(KEY_STORAGE) || ""; } catch { return ""; }
+};
+
+function makeClient(key) {
+  // dangerouslyAllowBrowser is required for browser use and makes the SDK send
+  // the anthropic-dangerous-direct-browser-access header the API expects.
+  return new Anthropic({ apiKey: key, dangerouslyAllowBrowser: true });
+}
+
+function setKey(key) {
+  try { localStorage.setItem(KEY_STORAGE, key); } catch { /* private mode */ }
+  client = makeClient(key);
+  renderKeyState();
+}
+
+function forgetKey() {
+  try { localStorage.removeItem(KEY_STORAGE); } catch { /* ignore */ }
+  client = null;
+  history.length = 0;
+  $("#chat-log").querySelectorAll(".chat-msg:not(:first-child), .chat-tool").forEach((n) => n.remove());
+  renderKeyState();
+}
+
+/** Show only enough of the key to recognise it — never the whole value. */
+const maskKey = (k) => (k.length > 8 ? `…${k.slice(-4)}` : "…");
+
+function renderKeyState() {
+  const key = readKey();
+  const hasKey = !!key;
+  $("#chat-key-setup").hidden = hasKey;
+  $("#chat-key-saved").hidden = !hasKey;
+  $("#chat-form").hidden = !hasKey;
+  if (hasKey) $("#chat-key-mask").textContent = maskKey(key);
+  setInputEnabled(hasKey);
+}
+
 async function postTurn(messages) {
-  const res = await fetch("/api/assistant", {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({ messages }),
-  });
-  const data = await res.json().catch(() => ({ error: `Server returned ${res.status}` }));
-  if (!res.ok) throw new Error(data.error || `Server returned ${res.status}`);
-  return data;
+  if (!client) throw new Error("No API key set.");
+
+  const request = {
+    model: MODEL,
+    max_tokens: MAX_TOKENS,
+    // Stable prefix (system + tools) is cached; the volatile state snapshot
+    // rides in the user turn, after this breakpoint.
+    system: [{ type: "text", text: SYSTEM_PROMPT, cache_control: { type: "ephemeral" } }],
+    tools: TOOLS,
+    output_config: { effort: "medium" },
+    messages,
+  };
+
+  let message;
+  try {
+    // Opus 5's safety classifiers can decline a request; a server-side fallback
+    // re-runs it on Anthropic's recommended model instead of surfacing the
+    // refusal. Beta — fall back to a plain call if the account can't use it.
+    message = await client.beta.messages.create({
+      ...request,
+      betas: ["server-side-fallback-2026-07-01"],
+      fallbacks: "default",
+    });
+  } catch (err) {
+    if (err?.status !== 400 && err?.status !== 404) throw err;
+    message = await client.messages.create(request);
+  }
+  return message;
+}
+
+/** Turn an SDK error into something worth showing a user. */
+function describeError(err) {
+  if (err instanceof Anthropic.AuthenticationError) {
+    return "That API key was rejected. Check it, or paste a different one.";
+  }
+  if (err instanceof Anthropic.PermissionDeniedError) {
+    return "This key doesn't have access to " + MODEL + ".";
+  }
+  if (err instanceof Anthropic.RateLimitError) {
+    return "Rate limited by the API — wait a moment and retry.";
+  }
+  if (err instanceof Anthropic.APIConnectionError) {
+    return "Couldn't reach the API. Check your connection.";
+  }
+  if (err instanceof Anthropic.APIError) {
+    return `API error ${err.status}: ${err.message}`;
+  }
+  return err?.message || "Unexpected error.";
 }
 
 /** A compact state snapshot, appended to the user's turn so the model always
@@ -210,10 +302,13 @@ async function sendMessage(text) {
     for (let round = 0; round < MAX_TOOL_ROUNDS; round++) {
       const reply = await postTurn(history);
 
-      if (reply.refusal) {
+      // Check stop_reason before trusting content: a refusal comes back as a
+      // successful response with empty or partial content.
+      if (reply.stop_reason === "refusal") {
         thinking.remove();
+        const category = reply.stop_details?.category;
         bubble("assistant", "I can't help with that request." +
-          (reply.category ? ` (declined: ${reply.category})` : ""), "error");
+          (category ? ` (declined: ${category})` : ""), "error");
         history.pop();
         return;
       }
@@ -250,7 +345,7 @@ async function sendMessage(text) {
     bubble("assistant", "I stopped after several tool steps without finishing — ask me to continue.", "error");
   } catch (err) {
     thinking.remove();
-    bubble("assistant", err.message, "error");
+    bubble("assistant", describeError(err), "error");
     // Drop the turn that failed so the conversation stays valid for a retry.
     if (history.at(-1)?.role === "user") history.pop();
   } finally {
@@ -266,7 +361,32 @@ function setInputEnabled(on) {
 }
 
 // ---------- wiring ----------
-export async function initAssistant() {
+export function initAssistant() {
+  // Key entry. The value is the user's own credential: it goes to
+  // localStorage and to api.anthropic.com, nowhere else.
+  $("#chat-key-form").addEventListener("submit", (e) => {
+    e.preventDefault();
+    const input = $("#chat-key-input");
+    const key = input.value.trim();
+    if (!key) return;
+    if (!/^sk-ant-/.test(key)) {
+      $("#chat-key-error").textContent =
+        "Anthropic keys start with “sk-ant-”. Paste the whole key.";
+      $("#chat-key-error").hidden = false;
+      return;
+    }
+    $("#chat-key-error").hidden = true;
+    input.value = "";
+    setKey(key);
+    bubble("assistant", "Key saved in this browser. What would you like to look at?");
+    $("#chat-input").focus();
+  });
+
+  $("#chat-key-forget").addEventListener("click", () => {
+    forgetKey();
+    bubble("assistant", "Key forgotten and this conversation cleared.");
+  });
+
   const form = $("#chat-form");
   form.addEventListener("submit", (e) => {
     e.preventDefault();
@@ -290,21 +410,8 @@ export async function initAssistant() {
     sendMessage(chip.textContent);
   });
 
-  // Is a key configured? Report honestly rather than failing on first use.
-  try {
-    const res = await fetch("/api/assistant");
-    const info = await res.json();
-    if (!info.available) {
-      setInputEnabled(false);
-      $("#chat-status").textContent =
-        "Set ANTHROPIC_API_KEY and restart the dev server to enable the assistant.";
-      $("#chat-status").hidden = false;
-      return;
-    }
-    $("#chat-status").hidden = true;
-  } catch {
-    setInputEnabled(false);
-    $("#chat-status").textContent = "Assistant endpoint unreachable — is the dev server running?";
-    $("#chat-status").hidden = false;
-  }
+  // Restore a key saved in a previous session, if there is one.
+  const saved = readKey();
+  if (saved) client = makeClient(saved);
+  renderKeyState();
 }
