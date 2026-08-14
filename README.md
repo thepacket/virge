@@ -27,8 +27,8 @@ Content Security Policy and what was verified.
 ## Features
 
 ### DNA sources
-45 sequences built from NCBI GenBank flat files, in 9 collapsible groups, with
-their **annotations** (900 features) rather than bare sequence:
+44 sequences built from NCBI GenBank flat files, in 9 collapsible groups, with
+their **annotations** (844 features) rather than bare sequence:
 
 | Group | Contents |
 | --- | --- |
@@ -36,15 +36,15 @@ their **annotations** (900 features) rather than bare sequence:
 | Expression vectors | pTrc99a, pGEX-4T-1, pGEX-6P-1, pEGFP-N1, pEGFP-C1 |
 | Yeast vectors | pRS313/314/315/316, 2-micron circle |
 | Plant vectors | pBI121, Ti plasmid |
-| Phage genomes | λ, φX174, T7, T4, M13 |
-| Viral genomes | SV40, HPV16, HBV, SARS-CoV-2, adenovirus 5, HSV-1, VZV, EBV, vaccinia |
+| Phage genomes | λ, φX174 RF, T7, T4, M13 RF |
+| Viral genomes | SV40, HPV16, HBV, adenovirus 5, HSV-1, VZV, EBV, vaccinia |
 | Natural plasmids | pPCP1, RK2/RP4, F plasmid |
 | Bacterial genomes | E. coli K-12 MG1655, E. coli O157:H7, B. subtilis 168 |
 | Organelle & chromosomes | human and yeast mitochondria, Arabidopsis chloroplast, yeast chromosome I |
 
 Sequences up to 62 kb are bundled; larger records (up to the 5.5 Mb E. coli
 O157:H7 genome) carry metadata only and are fetched from NCBI when selected,
-then cached for the session. This keeps the bundle to ~692 kB (182 kB gzipped, most of it sequence data plus the Anthropic SDK) while making whole
+then cached for the session. This keeps the bundle to ~682 kB (179 kB gzipped, most of it sequence data plus the Anthropic SDK) while making whole
 genomes usable — digesting E. coli K-12 with NotI yields 23 megabase-scale
 fragments, the real pulsed-field experiment, in about 60 ms.
 
@@ -52,6 +52,15 @@ Every accession was verified against NCBI before inclusion, and topology comes
 from NCBI rather than being assumed — with documented corrections where the
 deposited record disagrees with the molecule people actually handle (M13mp18
 RF, pACYC177 and RK2 are circular despite linear deposits).
+
+**The catalog is restricted to what a restriction enzyme can actually cut.** The
+build script rejects any accession NCBI reports as RNA, and requires any
+single-stranded genome to be named for its replicative form. SARS-CoV-2 was
+offered here until that check was written: `NC_045512` is ss-RNA by its own
+LOCUS line, restriction endonucleases do not cut RNA, and VIRGE drew it a gel
+with the same confidence as a plasmid digest. φX174 and M13 are ss-DNA virions
+and are now named RF, which is both the duplex form and the one sold — φX174 RF
+cut with HaeIII is the classic small-fragment size marker.
 
 Switching DNA keeps your lanes and recomputes every digest.
 

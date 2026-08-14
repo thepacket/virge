@@ -35,6 +35,14 @@ export function parseGenBank(text) {
   const version = text.match(/^VERSION\s+(\S+)/m)?.[1] || "";
   // The LOCUS line states topology; trust it rather than guessing.
   const circular = /\bcircular\b/i.test(locusRest);
+  // …and the molecule type, which decides whether a restriction digest is even
+  // a real experiment. Restriction endonucleases need a DNA duplex: they do not
+  // cut RNA at all, and a single strand has no second strand to nick. Recorded
+  // rather than acted on here — the parser's job is to report what the file
+  // says — but scripts/build-samples.mjs refuses to bundle anything but dsDNA,
+  // which is how an RNA virus stopped being offered as a digestible sample.
+  const moltype = (locusRest.match(/\b(ss-DNA|ds-DNA|ss-RNA|ds-RNA|ms-DNA|mRNA|cRNA|RNA|DNA)\b/i)?.[1] || "")
+    .toUpperCase();
 
   const originIdx = text.search(/^ORIGIN/m);
   if (originIdx === -1) return null;
@@ -94,6 +102,7 @@ export function parseGenBank(text) {
     name: definition || locusName,
     accession: version,
     circular,
+    moltype,
     sequence,
     features,
   };

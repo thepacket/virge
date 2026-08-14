@@ -126,6 +126,17 @@ check("on-demand samples carry metadata but no sequence",
   samples.filter(([, s]) => s.lazy).every(([, s]) => !s.sequence && s.accession && s.length > 0 && s.fetchAs), true);
 check("every sample has a topology",
   samples.every(([, s]) => s.topology === "circular" || s.topology === "linear"), true);
+// A restriction digest needs a DNA duplex, so nothing in the catalog may be RNA
+// or an un-labelled single strand. SARS-CoV-2 (NC_045512, ss-RNA by its own
+// LOCUS line) was offered here and drew a gel as confidently as a plasmid.
+// scripts/build-samples.mjs enforces this at build time against NCBI; this
+// pins the shipped result so a hand-edit of the generated file cannot undo it.
+check("no RNA genome is offered as a sample",
+  samples.some(([, s]) => /SARS|coronavirus|influenza|\bRNA\b/i.test(s.name + " " + (s.description || ""))), false);
+// phiX174 and M13 are ss-DNA virions; only their replicative form is a duplex.
+check("single-stranded genomes are named for their replicative form",
+  ["phiX174", "M13", "M13mp18"].map((k) => /\bRF\b/.test(SAMPLES[k].name)), [true, true, true]);
+
 // Plasmids deposited as linear records must be corrected, or a digest loses the
 // junction fragment.
 check("circular plasmids corrected",

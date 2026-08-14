@@ -49,16 +49,26 @@ const SAMPLES = [
 
   // --- Phage ---
   { key: "lambda",        acc: "J02459.1",    name: "Lambda phage",          group: "Phage genomes" },
-  { key: "phiX174",       acc: "NC_001422.1", name: "phiX174 phage",         group: "Phage genomes" },
+  // phiX174 and M13 are ss-DNA in the virion — GenBank labels NC_001422 exactly
+  // that — and restriction enzymes need a duplex. Both are named for their
+  // replicative form, which is the double-stranded intracellular intermediate
+  // and the form actually sold and digested. phiX174 RF cut with HaeIII is the
+  // classic small-fragment size marker, so this is a labelling fix rather than
+  // grounds for dropping them.
+  { key: "phiX174",       acc: "NC_001422.1", name: "phiX174 (RF)",          group: "Phage genomes" },
   { key: "T7",            acc: "NC_001604.1", name: "T7 phage",              group: "Phage genomes" },
   { key: "T4",            acc: "NC_000866.4", name: "T4 phage",              group: "Phage genomes" },
-  { key: "M13",           acc: "V00604.2",    name: "M13 phage (wild type)", group: "Phage genomes" },
+  { key: "M13",           acc: "V00604.2",    name: "M13 (RF, wild type)",   group: "Phage genomes" },
 
   // --- Viral genomes ---
   { key: "SV40",          acc: "J02400.1",    name: "SV40",                  group: "Viral genomes" },
   { key: "HPV16",         acc: "NC_001526.4", name: "Human papillomavirus 16", group: "Viral genomes" },
   { key: "HBV",           acc: "NC_003977.2", name: "Hepatitis B virus",     group: "Viral genomes" },
-  { key: "SARS2",         acc: "NC_045512.2", name: "SARS-CoV-2 (Wuhan-Hu-1)", group: "Viral genomes" },
+  // SARS-CoV-2 was here and has been removed deliberately. NC_045512 is ss-RNA
+  // by its own LOCUS line, and restriction endonucleases do not cut RNA — the
+  // gel VIRGE drew for it was fiction presented with the same confidence as a
+  // plasmid digest. Nothing short of a cDNA clone makes it a real experiment,
+  // and there is no single accession for that.
   { key: "adeno5",        acc: "AC_000008.1", name: "Human adenovirus 5",    group: "Viral genomes" },
   { key: "HSV1",          acc: "NC_001806.2", name: "Herpes simplex virus 1", group: "Viral genomes" },
   { key: "VZV",           acc: "NC_001348.1", name: "Varicella-zoster virus", group: "Viral genomes" },
@@ -106,7 +116,10 @@ async function summarise(accessions) {
   const byAcc = {};
   for (const uid of result.uids) {
     const r = result[uid];
-    byAcc[r.accessionversion] = { length: r.slen, title: r.title, topology: r.topology };
+    byAcc[r.accessionversion] = {
+      length: r.slen, title: r.title, topology: r.topology,
+      moltype: r.moltype, strand: r.strand,
+    };
   }
   return byAcc;
 }
@@ -118,6 +131,24 @@ const out = {};
 for (const s of SAMPLES) {
   const info = summary[s.acc];
   if (!info) throw new Error(`${s.acc} (${s.key}): not found at NCBI`);
+
+  // A restriction digest needs a DNA duplex, so the catalog has to be one.
+  // SARS-CoV-2 sat here for a while as ss-RNA: VIRGE drew it a gel with the
+  // same confidence as a plasmid digest, and nothing in the pipeline objected.
+  if (info.moltype !== "dna") {
+    throw new Error(
+      `${s.acc} (${s.key}): moltype is "${info.moltype}" — restriction enzymes do not cut RNA. ` +
+      `Remove it, or point at a cDNA clone accession.`);
+  }
+  // Single-stranded genomes (phiX174, M13) are only digestible as their
+  // double-stranded replicative form, which is also the form sold and used.
+  // That is a naming obligation, not a reason to exclude them — but the name
+  // has to say so, or the sample claims something the molecule cannot do.
+  if (info.strand === "ss" && !/\bRF\b/.test(s.name)) {
+    throw new Error(
+      `${s.acc} (${s.key}): NCBI reports a single-stranded genome, but "${s.name}" does not say RF. ` +
+      `Restriction enzymes need a duplex; name it for the replicative form.`);
+  }
 
   const bundled = info.length <= BUNDLE_LIMIT;
   const base = {
