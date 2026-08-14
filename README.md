@@ -3,6 +3,8 @@
 A restriction digest simulator: load a plasmid, pick enzymes, and see the
 fragment sizes plus a rendered virtual agarose gel.
 
+Live at **[virge.fly.dev](https://virge.fly.dev)**.
+
 ## Run
 
 ```

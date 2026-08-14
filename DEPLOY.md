@@ -1,5 +1,7 @@
 # Deploying to fly.io
 
+Deployed at **[virge.fly.dev](https://virge.fly.dev)**.
+
 VIRGE has no server component. The Docker image is a Vite build served by
 nginx, so a deployment is static files behind Fly's TLS terminator — no
 secrets, no environment variables, no volumes, no database.
@@ -50,11 +52,18 @@ request after an idle period pays a wake-up of roughly a second. Set
 this. The work VIRGE does — site searching, fragment assembly, canvas
 rendering — happens in the visitor's browser, not here.
 
-**The bundle is one large chunk.** About 710 kB of JavaScript, 186 kB gzipped,
-most of it the bundled enzyme table and sample sequences. It is served once per
-cold visit and then cached for a year. Sequences too large to bundle are marked
-lazy and fetched from NCBI by the browser, so their bandwidth is NCBI's rather
-than this deployment's.
+**The bundle is one large chunk.** About 710 kB of JavaScript, most of it the
+bundled enzyme table and sample sequences. It is served once per cold visit and
+then cached for a year. Sequences too large to bundle are marked lazy and
+fetched from NCBI by the browser, so their bandwidth is NCBI's rather than this
+deployment's.
+
+**Fly's edge compresses, not nginx.** In production the bundle arrives as
+197 kB with brotli/zstd — better than the 228 kB nginx's own `gzip on` produces,
+and it wins because the edge re-encodes. The nginx directive is not redundant
+(it covers a direct hit on the container, which is how the image was smoke
+tested), but it is not what visitors get. A `curl -I` will show neither, because
+Fly does not compress a HEAD response: measure with a real GET.
 
 ## Caching
 
@@ -93,15 +102,16 @@ external module and a linked stylesheet, and the app sets no style attributes.
 Adding an inline handler or a `style="…"` attribute would break in production
 and pass in dev — the same asymmetry, without a check to catch it.
 
-## Verified locally
+## Verified
 
-The image was built and driven in a browser when this was written:
+Both against a local container and against the live deployment, when this was
+written:
 
 - `nginx -t` clean; `/healthz` 200; 404 for a missing asset
 - CSP, `X-Frame-Options`, `X-Content-Type-Options` and `Referrer-Policy`
   present on the shell, on a hashed asset and on a fallback path
 - `Cache-Control: no-cache` on the shell, `immutable` on `/assets/*`
-- gzip active (710 kB bundle → 228 kB on the wire)
+- compression active — 228 kB from nginx directly, 197 kB through Fly's edge
 - the app loaded and rendered with no CSP violations in the console
 - `NC_005816` fetched from NCBI through the app under the production CSP —
   9,609 bp, 20 features, the correct pPCP1 record
@@ -110,7 +120,12 @@ The image was built and driven in a browser when this was written:
 - a fetch to an unlisted host was refused, so the policy is enforced and not
   merely present
 
-That is a record of one occasion, not a standing guarantee. To repeat it:
+On https://virge.fly.dev specifically: `force_https` redirects plain http with a
+301, all four security headers survive Fly's proxy unchanged, the caching split
+holds, and `NC_005816` again fetched and parsed correctly with a clean console.
+
+That is a record of one occasion, not a standing guarantee. To repeat the local
+half:
 
 ```bash
 docker build -t virge:test . && docker run --rm -p 8099:80 virge:test
