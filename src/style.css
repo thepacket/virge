@@ -131,15 +131,19 @@ textarea { width: 100%; padding: 8px; resize: vertical; font-family: ui-monospac
    `primary` and `ghost` are kept as no-op aliases so existing markup and the
    JS that generates buttons keep working. */
 .btn {
-  padding: 7px 12px;
+  padding: 2px 9px;
+  font-size: 12px;
+  min-height: 24px;      /* one button height throughout */
   cursor: pointer;
   background: var(--accent-dim);
   border-color: var(--accent);
   color: var(--accent);
   font-weight: 600;
+  align-self: center;    /* never stretch to fill a flex row */
 }
 .btn:hover:not(:disabled) { background: #22c55e4d; }
-.btn.small { padding: 2px 7px; font-size: 12px; margin-left: auto; }
+/* `small` is now layout-only: it right-aligns a button in a flex header. */
+.btn.small { margin-left: auto; }
 .btn:disabled { opacity: 0.4; cursor: default; border-color: var(--border); color: var(--muted); background: transparent; }
 #add-lane { flex: 1; text-align: left; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
@@ -227,8 +231,9 @@ body.busy .dna-item { pointer-events: none; opacity: 0.6; }
 
 .dna-line { display: flex; align-items: stretch; border-top: 1px solid var(--border); }
 .dna-line .dna-item { border-top: none; flex: 1; }
-.dna-line .del-seq { margin: 0; padding: 0 8px; border: none; border-radius: 0; opacity: 0; }
-.dna-line:hover .del-seq { opacity: 1; }
+/* Revealed on hover, but otherwise an ordinary button like every other. */
+.dna-line .del-seq { margin: 0 8px 0 4px; opacity: 0; }
+.dna-line:hover .del-seq, .dna-line .del-seq:focus-visible { opacity: 1; }
 
 .frag-feat {
   display: block; font-size: 10px; opacity: 0.75;
