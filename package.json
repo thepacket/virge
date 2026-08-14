@@ -4,7 +4,7 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "test": "node scripts/test.mjs",
+    "test": "node scripts/test.mjs && node scripts/test-dom.mjs",
     "dev": "vite",
     "build": "npm run check:csp && vite build",
     "preview": "vite preview",
@@ -17,9 +17,11 @@
   "license": "ISC",
   "type": "module",
   "devDependencies": {
+    "linkedom": "^0.18.13",
     "vite": "^8.2.1"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.117.1"
-  }
+  },
+  "scripts:test:dom": "node scripts/test-dom.mjs"
 }

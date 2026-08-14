@@ -331,8 +331,16 @@ pasted sequence embed it, so they stay portable.
   GenBank and parses their annotations
 - `src/genbank.js` — GenBank/FASTA parsers, shared by the build script and the
   browser so the two import paths cannot drift apart
-- `scripts/test.mjs` — regression tests (`npm test`), checked against published
+- `scripts/test.mjs` — science regression tests (92), checked against published
   restriction maps rather than this code's own output
+- `scripts/test-dom.mjs` + `scripts/dom-harness.mjs` — UI regression tests (31).
+  The harness parses the real `index.html`, installs the browser globals, and
+  records canvas drawing instead of rasterising it, so a test can ask what was
+  actually drawn. Every check corresponds to a bug that shipped: pulsed-field
+  mode silently not engaging, Suggest appending instead of replacing, the import
+  status naming the previous sequence, the Clear button wiped by an `innerHTML`
+  re-render. Each was reintroduced and confirmed to fail the suite — the science
+  tests catch none of them, and a screenshot passes for all of them
 - `src/data/enzymes.js` — generated enzyme data (do not edit by hand)
 - `src/data/samples.js` — GenBank sequences with group metadata
 - `src/enzymes.js` — catalog helpers (overhangs, display, buffer checks)

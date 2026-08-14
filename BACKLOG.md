@@ -35,11 +35,30 @@ strand, cut coordinates), and GenBank features are now available to draw as
 arcs around the ring — this is the natural next step now that annotations are
 loaded.
 
-## 2b. Feature-aware selection helpers
+## 2b. Feature-aware selection helpers — half done
 
-With annotations in hand: "cut out this feature" (propose enzyme pairs flanking
-a chosen gene without cutting inside it), and warn when a selected enzyme cuts
-*within* a named feature — the standard "will this destroy my insert?" check.
+**Done:** selecting enzymes that cut inside an annotated gene or origin now
+warns, naming the features hit. `featuresCutBy()` in `src/genbank.js` is shared
+with Suggest's scoring, so the automated and hand-picked paths agree.
+
+**Still open:** "cut out this feature" — propose enzyme pairs flanking a chosen
+gene without cutting inside it. Needs a feature picker in the UI; the scoring
+half already exists in `suggest.js`.
+
+## 2c. Lane captions collide on a narrow gel
+
+At around 1150 px with both side panes open the centre column is ~370 px, and
+the lane captions drawn above each lane overlap. Pre-existing at narrow canvas
+widths, but the three-column layout made it reachable on a laptop rather than
+only on a phone. Collapsing either pane clears it. Fix is in `gel.js`: stagger,
+rotate, or abbreviate captions once `laneW` drops below the text width.
+
+## 2d. One 710 kB bundle
+
+The build emits a single chunk, 186 kB gzipped, most of it the enzyme table and
+the bundled sample sequences — both of which grow with every addition. Served
+once per cold visit and cached for a year, so it is not urgent, but the obvious
+fix when it matters is a dynamic import of `src/data/samples.js`.
 
 ## 3. Partial digest simulation
 
