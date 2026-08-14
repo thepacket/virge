@@ -127,13 +127,20 @@ select, textarea, button {
 select { padding: 6px 8px; max-width: 100%; }
 textarea { width: 100%; padding: 8px; resize: vertical; font-family: ui-monospace, monospace; font-size: 12px; margin-top: 8px; }
 
-.btn { padding: 7px 12px; cursor: pointer; }
-.btn:hover { border-color: var(--accent); }
-.btn.primary { background: var(--accent-dim); border-color: var(--accent); color: var(--accent); font-weight: 600; }
-.btn.ghost { background: transparent; }
+/* One button style throughout, the accented look of the ✨ Suggest button.
+   `primary` and `ghost` are kept as no-op aliases so existing markup and the
+   JS that generates buttons keep working. */
+.btn {
+  padding: 7px 12px;
+  cursor: pointer;
+  background: var(--accent-dim);
+  border-color: var(--accent);
+  color: var(--accent);
+  font-weight: 600;
+}
+.btn:hover:not(:disabled) { background: #22c55e4d; }
 .btn.small { padding: 2px 7px; font-size: 12px; margin-left: auto; }
-.btn:disabled { opacity: 0.4; cursor: default; border-color: var(--border); color: var(--muted); }
-.btn.primary:disabled { background: transparent; }
+.btn:disabled { opacity: 0.4; cursor: default; border-color: var(--border); color: var(--muted); background: transparent; }
 #add-lane { flex: 1; text-align: left; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 .row { display: flex; gap: 10px; align-items: center; margin-top: 10px; flex-wrap: wrap; }
@@ -190,7 +197,10 @@ label.inline { flex-direction: row; align-items: center; gap: 5px; color: var(--
 }
 .config-load:hover { border-color: var(--accent); }
 .config-name { font-weight: 600; font-size: 13px; }
-.btn.danger { border-color: #e5534b; color: #e5534b; }
+/* The armed state of a two-click delete keeps its warning colour. */
+.btn.danger, .btn.danger:hover:not(:disabled) {
+  border-color: #e5534b; color: #e5534b; background: #e5534b1f;
+}
 #lib-status { margin-top: 8px; min-height: 1em; color: var(--accent); }
 
 .dropzone {
