@@ -8,7 +8,8 @@
 -->
 
 **This repository does not accept pull requests.** This PR will be closed
-automatically — see [CONTRIBUTING.md](../blob/main/CONTRIBUTING.md).
+automatically — see
+[CONTRIBUTING.md](https://github.com/thepacket/virge/blob/main/CONTRIBUTING.md).
 
 If you have found a bug, please open an issue instead. If you want to change
 how VIRGE works, please fork it.
