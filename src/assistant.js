@@ -234,6 +234,12 @@ function clearConversation() {
   $("#chat-log")
     .querySelectorAll(".chat-msg:not(:first-child), .chat-tool")
     .forEach((n) => n.remove());
+  // The count described a request that is no longer part of any conversation,
+  // and a stale number under the box is the bug this project just spent a
+  // commit fixing for the import status.
+  lastUsage = null;
+  turnUsage = null;
+  renderUsage();
   updateClearState();
 }
 
@@ -260,6 +266,50 @@ function renderKeyState() {
   $("#chat-form").hidden = !hasKey;
   if (hasKey) $("#chat-key-mask").textContent = maskKey(key);
   setInputEnabled(hasKey);
+}
+
+// ---------- token usage ----------
+// A "turn" is not one request: the tool loop can issue up to MAX_TOOL_ROUNDS of
+// them, each resending the whole conversation. Showing only the last request
+// would understate a turn that took five, so the last request is what the line
+// reports and the turn total rides in the tooltip.
+let lastUsage = null;
+let turnUsage = null;
+
+function startTurnUsage() {
+  turnUsage = { input: 0, output: 0, cached: 0, requests: 0 };
+}
+
+function recordUsage(usage) {
+  if (!usage) return;
+  const input = usage.input_tokens ?? 0;
+  const output = usage.output_tokens ?? 0;
+  // Cache reads are billed at a fraction of the input rate and are not included
+  // in input_tokens, so leaving them out would misreport the cost of a long
+  // conversation — the cached system prompt and tool schemas are most of it.
+  const cached = usage.cache_read_input_tokens ?? 0;
+  const created = usage.cache_creation_input_tokens ?? 0;
+  lastUsage = { input, output, cached, created };
+  if (turnUsage) {
+    turnUsage.input += input + created;
+    turnUsage.output += output;
+    turnUsage.cached += cached;
+    turnUsage.requests += 1;
+  }
+  renderUsage();
+}
+
+function renderUsage() {
+  const el = $("#chat-usage");
+  if (!lastUsage) { el.hidden = true; el.textContent = ""; el.removeAttribute("title"); return; }
+  const n = (v) => v.toLocaleString();
+  el.textContent = `${n(lastUsage.input)} in · ${n(lastUsage.output)} out` +
+    (lastUsage.cached ? ` · ${n(lastUsage.cached)} cached` : "");
+  el.title = turnUsage && turnUsage.requests > 1
+    ? `Last request. This turn: ${n(turnUsage.input)} in, ${n(turnUsage.output)} out, ` +
+      `${n(turnUsage.cached)} cached over ${turnUsage.requests} requests.`
+    : "Tokens billed for the last request. Cached input bills at a fraction of the input rate.";
+  el.hidden = false;
 }
 
 async function postTurn(messages) {
@@ -290,6 +340,7 @@ async function postTurn(messages) {
     if (err?.status !== 400 && err?.status !== 404) throw err;
     message = await client.messages.create(request);
   }
+  recordUsage(message?.usage);
   return message;
 }
 
@@ -332,6 +383,7 @@ async function sendMessage(text) {
   if (busy) return;
   busy = true;
   setInputEnabled(false);
+  startTurnUsage();
 
   bubble("user", text);
   history.push({

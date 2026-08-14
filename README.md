@@ -368,6 +368,14 @@ files never enters the bundle.
 If no working sanitiser is available the reply is escaped and shown verbatim
 rather than rendered — the failure mode is ugly, not unsafe.
 
+**Token usage** sits under the composer: `1,284 in · 312 out · 1,150 cached` for
+the last request. Cache reads are shown because they are not counted in
+`input_tokens` and are most of a long conversation's input — the system prompt
+and tool schemas are cached behind a breakpoint, so omitting them would
+misreport what a turn costs. A turn is not one request, though: the tool loop
+resends the whole conversation each round, so the line reports the last request
+and the tooltip carries the turn total and how many requests it took.
+
 **Clear** (above Send) drops the conversation the assistant remembers, so the
 next question starts from nothing — useful when you switch topic and don't want
 earlier turns steering the answer, or to stop paying to resend a long history.

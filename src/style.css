@@ -501,7 +501,8 @@ details summary { cursor: pointer; color: var(--muted); font-size: 13px; margin-
 .assistant-card > .card-head,
 .assistant-card > .key-setup,
 .assistant-card > .key-saved,
-.assistant-card > .chat-form { flex: none; }
+.assistant-card > .chat-form,
+.assistant-card > .chat-usage { flex: none; }
 
 .key-setup .row { margin-top: 0; }
 #chat-key-input {
@@ -598,6 +599,18 @@ details summary { cursor: pointer; color: var(--muted); font-size: 13px; margin-
 }
 #chat-input:focus { outline: none; border-color: var(--accent); }
 #chat-input:disabled { opacity: 0.5; }
+
+/* Token count for the last request. Muted and monospaced: it is a meter, not a
+   message, and digits that change between turns should not shift the line. */
+.chat-usage {
+  flex: none;
+  margin-top: 5px;
+  font-family: ui-monospace, monospace;
+  font-size: 10.5px;
+  color: var(--muted);
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
 
 .footnote {
   text-align: center;

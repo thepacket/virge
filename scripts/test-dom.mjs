@@ -179,6 +179,61 @@ tick("EcoRI");
 check("EcoRI does not warn", app.$("#feature-warning").hasAttribute("hidden"), true);
 app.click("#clear-sel");
 
+// --- Token usage under the composer ------------------------------------------
+// Driven through the real assistant path: a stubbed API response goes through
+// postTurn, so this exercises the same code a live key would.
+const usage = () => (app.$("#chat-usage").hasAttribute("hidden")
+  ? null : app.$("#chat-usage").textContent);
+check("no count before anything has been sent", usage(), null);
+
+// Queue of stubbed API replies, so a turn can be made to take several requests.
+const apiQueue = [];
+globalThis.fetch = async (url) => {
+  const u = typeof url === "string" ? url : url.url;
+  if (!u.includes("api.anthropic.com")) throw new Error("no network in tests");
+  const body = apiQueue.shift();
+  if (!body) throw new Error("no stubbed reply queued");
+  return new Response(JSON.stringify(body), {
+    status: 200, headers: { "content-type": "application/json" },
+  });
+};
+const reply = (usageObj, content = [{ type: "text", text: "ok" }], stop = "end_turn") => ({
+  id: "m", type: "message", role: "assistant", model: "claude-opus-5",
+  content, stop_reason: stop, usage: usageObj,
+});
+const submit = (sel) => app.$(sel).dispatchEvent(
+  new app.window.Event("submit", { bubbles: true, cancelable: true }));
+
+app.$("#chat-key-input").value = "sk-ant-test";
+submit("#chat-key-form");
+
+apiQueue.push(reply({ input_tokens: 1284, output_tokens: 312, cache_read_input_tokens: 1150 }));
+app.$("#chat-input").value = "hello";
+submit("#chat-form");
+await new Promise((r) => setTimeout(r, 300));
+
+check("the last request's tokens are shown", usage(), "1,284 in · 312 out · 1,150 cached");
+check("thousands are grouped, not raw digits", /\d,\d{3}/.test(usage()), true);
+
+// A turn is not one request: the tool loop resends the whole conversation each
+// round, so reporting only the last would understate what was billed.
+apiQueue.push(
+  reply({ input_tokens: 2000, output_tokens: 100 },
+        [{ type: "tool_use", id: "t1", name: "get_app_state", input: {} }], "tool_use"),
+  reply({ input_tokens: 2500, output_tokens: 400 }));
+app.$("#chat-input").value = "set something up";
+submit("#chat-form");
+await new Promise((r) => setTimeout(r, 400));
+
+check("the line still reports the last request", usage(), "2,500 in · 400 out");
+check("but the turn total is in the tooltip",
+  /4,500 in, 500 out.*over 2 requests/.test(app.$("#chat-usage").title), true);
+
+// A count describing a conversation that no longer exists is the stale-status
+// bug again, so Clear takes it with it.
+app.click("#chat-clear");
+check("clearing the conversation clears the count", usage(), null);
+
 // --- Searching the catalog by name -------------------------------------------
 const dnaNames = () => app.$$(".dna-item .dna-name").map((e) => e.textContent);
 const searchNote = () => (app.$("#dna-search-note").hasAttribute("hidden")
