@@ -427,10 +427,13 @@ $("#clear-lanes").addEventListener("click", () => {
 });
 
 $("#suggest-digests").addEventListener("click", () => {
-  const existing = state.lanes.map((l) => [...l.enzymeNames].sort().join("+"));
+  // Suggest replaces the gel rather than appending to it: the picks are chosen
+  // as a set that reads well together, so mixing them into whatever was already
+  // loaded gives a gel that is neither. `existing` is therefore empty — the
+  // lanes about to be cleared must not veto the digests replacing them.
   const picks = suggestDigests(state.seq, state.circular, {
     count: 3,
-    existing,
+    existing: [],
     methylation: state.methylation,
     features: state.features,          // so it won't propose cutting through genes
     purpose: $("#suggest-purpose").value,
@@ -447,7 +450,9 @@ $("#suggest-digests").addEventListener("click", () => {
     return;
   }
   $("#suggest-note").hidden = true;
-  for (const names of picks) state.lanes.push({ enzymeNames: names });
+  // Cleared only now that there is something to put in their place — a purpose
+  // with no suitable digest returns above with the gel untouched.
+  state.lanes = picks.map((names) => ({ enzymeNames: names }));
   renderAll();
 });
 

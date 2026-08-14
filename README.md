@@ -129,6 +129,11 @@ selector beside it:
 | Cloning | ~2 bands | **not cutting inside annotated genes**, common enzymes |
 | Fingerprinting | ~12 bands | resolution and spread; gene-cutting irrelevant |
 
+It **replaces** the lanes rather than appending to them — the picks are chosen
+as a set that reads well together, so mixing them into whatever was already
+loaded gives a gel that is neither. A purpose with no suitable digest says so
+and leaves the existing lanes alone.
+
 It rejects pairs that can't share a tube (the same temperature check the manual
 lane warning uses), collapses isoschizomers and no-op pairs by comparing the cuts
 they actually produce rather than enzyme names, and returns fewer than three
