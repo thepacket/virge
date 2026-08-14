@@ -43,7 +43,7 @@ const GEL = {
   laneLabel: 0.86,          // sample lane captions
   ladderLabel: 0.56,        // ladder caption + "size standard" note
   sizeLabel: 0.52,          // the ladder's bp labels
-  hint: 0.42,               // electrode marks, empty-state text
+  hint: 0.42,               // empty-state text
   sampleBand: 1.0,          // full strength
   ladderBand: 0.62,         // dimmer, so the reference reads as reference
 };
@@ -235,11 +235,4 @@ export function renderGel(canvas, lanes, opts) {
     ctx.fillText("Select enzymes at left and click “Add lane with selection”,", cx, H / 2 + 12);
     ctx.fillText("or press ✨ Suggest. The lane at left is the size ladder.", cx, H / 2 + 27);
   }
-
-  // electrode hints
-  ctx.fillStyle = ink(GEL.hint);
-  ctx.font = "11px system-ui, sans-serif";
-  ctx.textAlign = "left";
-  ctx.fillText("− wells", 8, wellY);
-  ctx.fillText("+", 8, H - 20);
 }
