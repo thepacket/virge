@@ -12,3 +12,4 @@ Dockerfile
 .dockerignore
 fly.toml
 *.md
+docs

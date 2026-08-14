@@ -5,6 +5,8 @@ fragment sizes plus a rendered virtual agarose gel.
 
 Live at **[virge.fly.dev](https://virge.fly.dev)**.
 
+![VIRGE: pBI121 digested with HindIII, HindIII + EcoRI, PvuII and NcoI on a 0.7% gel, beside the annotated fragment table and the AI assistant explaining its imaging choices](docs/hero.png)
+
 ## Run
 
 ```
