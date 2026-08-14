@@ -6,10 +6,11 @@
   "scripts": {
     "test": "node scripts/test.mjs",
     "dev": "vite",
-    "build": "vite build",
+    "build": "npm run check:csp && vite build",
     "preview": "vite preview",
     "build:enzymes": "node scripts/build-enzymes.mjs",
-    "build:samples": "node scripts/build-samples.mjs"
+    "build:samples": "node scripts/build-samples.mjs",
+    "check:csp": "node scripts/check-csp.mjs"
   },
   "keywords": [],
   "author": "",

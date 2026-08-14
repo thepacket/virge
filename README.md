@@ -18,6 +18,10 @@ npm run build:enzymes
 npm test
 ```
 
+To deploy: `fly deploy`. VIRGE is static files behind nginx with no server
+component and no secrets — see [DEPLOY.md](DEPLOY.md) for the image, the
+Content Security Policy and what was verified.
+
 ## Features
 
 ### DNA sources
@@ -292,6 +296,9 @@ pasted sequence embed it, so they stay portable.
 - `src/main.js` — UI state, config library, wiring
 - `src/assistant.js` — AI assistant: key handling, tool loop, chat UI
 - `src/assistant-config.js` — assistant system prompt and tool schemas
+- `scripts/check-csp.mjs` — fails the build if the source fetches a host the
+  production CSP forbids (dev applies no CSP, so nothing else catches it)
+- `Dockerfile`, `nginx.conf`, `security-headers.conf`, `fly.toml` — deployment
 
 ## Contributing
 
