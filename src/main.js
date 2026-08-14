@@ -827,6 +827,42 @@ function initSections() {
   }
 }
 
+// ---------- Collapsible side panes ----------
+const PANES_KEY = "virge-panes";
+
+function initPanes() {
+  const layout = document.getElementById("layout");
+  const panes = {
+    left: { el: document.getElementById("pane-left"), label: "configuration" },
+    right: { el: document.getElementById("pane-right"), label: "assistant" },
+  };
+
+  let saved = {};
+  try { saved = JSON.parse(localStorage.getItem(PANES_KEY)) || {}; } catch { /* defaults */ }
+
+  const apply = (side, collapsed) => {
+    const { el, label } = panes[side];
+    el.classList.toggle("collapsed", collapsed);
+    layout.dataset[side] = collapsed ? "collapsed" : "expanded";
+    const btn = el.querySelector(".pane-toggle");
+    btn.setAttribute("aria-expanded", String(!collapsed));
+    btn.title = `${collapsed ? "Show" : "Collapse"} the ${label} panel`;
+  };
+
+  for (const side of Object.keys(panes)) {
+    apply(side, saved[side] === true);
+    panes[side].el.querySelector(".pane-toggle").addEventListener("click", () => {
+      const collapsed = !panes[side].el.classList.contains("collapsed");
+      apply(side, collapsed);
+      saved[side] = collapsed;
+      localStorage.setItem(PANES_KEY, JSON.stringify(saved));
+      // The centre column widens or narrows, and the canvas is sized from its
+      // box, so redraw once the new grid tracks have settled.
+      requestAnimationFrame(renderGelOnly);
+    });
+  }
+}
+
 // ---------- API surface the AI assistant's tools drive ----------
 // Exposed deliberately rather than letting the assistant reach into internals,
 // so every action it takes goes through the same paths the UI uses.
@@ -894,6 +930,7 @@ registerAssistantApp({
 setExposure(0, { redraw: false });
 setContrast(0.5, { redraw: false });
 initSections();
+initPanes();
 initAssistant();
 initSamples();
 renderLibrary();

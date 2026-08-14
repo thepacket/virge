@@ -15,9 +15,15 @@
     </div>
   </header>
 
-  <main class="layout">
+  <main class="layout" id="layout">
     <!-- Left panel: DNA + enzymes -->
-    <aside class="panel controls">
+    <aside class="panel controls" id="pane-left">
+      <button type="button" class="pane-toggle" data-pane="left" aria-expanded="true"
+              aria-controls="pane-left-body" title="Collapse the configuration panel">
+        <span class="pane-caret" aria-hidden="true"></span>
+        <span class="pane-name">Configuration</span>
+      </button>
+      <div class="pane-body" id="pane-left-body">
       <details class="card section" id="sec-dna" open>
         <summary class="card-head"><h2>1 · DNA Source</h2></summary>
         <div id="dna-groups" class="dna-groups"></div>
@@ -135,25 +141,33 @@
         <div id="lib-status" class="hint" role="status"></div>
         <div id="config-list" class="config-list"></div>
       </details>
-
+      </div>
     </aside>
 
     <!-- Middle: gel + results -->
-    <section class="panel results">
-      <div class="gel-wrap card">
-        <canvas id="gel-canvas" width="760" height="560"></canvas>
-      </div>
-      <div class="card" id="lanes-card">
-        <div class="card-head">
-          <h2>Lanes &amp; Fragments</h2>
-          <button id="clear-lanes" class="btn ghost small" title="Remove every digest lane from the gel">Clear lanes</button>
+    <section class="panel results" id="pane-centre">
+      <div class="pane-body">
+        <div class="gel-wrap card">
+          <canvas id="gel-canvas" width="760" height="560"></canvas>
         </div>
-        <div id="lane-table"></div>
+        <div class="card" id="lanes-card">
+          <div class="card-head">
+            <h2>Lanes &amp; Fragments</h2>
+            <button id="clear-lanes" class="btn ghost small" title="Remove every digest lane from the gel">Clear lanes</button>
+          </div>
+          <div id="lane-table"></div>
+        </div>
       </div>
     </section>
 
     <!-- Right panel: AI assistant -->
-    <aside class="panel assistant">
+    <aside class="panel assistant" id="pane-right">
+      <button type="button" class="pane-toggle" data-pane="right" aria-expanded="true"
+              aria-controls="pane-right-body" title="Collapse the assistant panel">
+        <span class="pane-caret" aria-hidden="true"></span>
+        <span class="pane-name">Assistant</span>
+      </button>
+      <div class="pane-body" id="pane-right-body">
       <div class="card assistant-card">
         <div class="card-head"><h2>✨ Assistant</h2></div>
 
@@ -193,6 +207,7 @@
             <button type="submit" id="chat-send" class="btn">Send</button>
           </div>
         </form>
+      </div>
       </div>
     </aside>
   </main>

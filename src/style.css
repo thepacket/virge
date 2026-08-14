@@ -79,11 +79,15 @@ body {
 
 .layout {
   display: grid;
-  /* Wide enough for two columns of enzymes at their natural width, so the
-     panel never needs a horizontal scrollbar. Only the four homing
-     endonucleases (18–39 bp sites) still ellipsise; their full site is in the
-     row tooltip. */
-  grid-template-columns: 480px minmax(0, 1fr) 360px;
+  /* The side columns are variables so collapsing one is a single custom-property
+     flip rather than a second grid declaration per breakpoint. 480px is wide
+     enough for two columns of enzymes at their natural width, so the panel never
+     needs a horizontal scrollbar. Only the four homing endonucleases (18–39 bp
+     sites) still ellipsise; their full site is in the row tooltip. */
+  --col-left: 480px;
+  --col-right: 360px;
+  --col-rail: 30px;
+  grid-template-columns: var(--col-left) minmax(0, 1fr) var(--col-right);
   gap: 18px;
   padding: 18px 22px 0;
   width: 100%;
@@ -91,23 +95,98 @@ body {
   flex: 1;
   min-height: 0; /* allow children to shrink so they can scroll */
 }
+.layout[data-left="collapsed"] { --col-left: var(--col-rail); }
+.layout[data-right="collapsed"] { --col-right: var(--col-rail); }
+
+/* Each pane is a non-scrolling shell holding a fixed toggle rail and a scrolling
+   body, so the three bodies scroll independently and a toggle never scrolls out
+   of reach. */
 .panel {
-  overflow-y: auto;
+  display: flex;
   min-height: 0;
+  min-width: 0;
+  overflow: hidden;
+}
+.pane-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
   padding-bottom: 18px;
 }
-/* Below three-column width the assistant drops under the other two and the
-   page itself scrolls, rather than squeezing the gel into a sliver. */
-@media (max-width: 1280px) {
-  body { overflow: auto; display: block; }
-  .layout { grid-template-columns: 480px minmax(0, 1fr); }
-  .panel { overflow-y: visible; }
-  .panel.assistant { grid-column: 1 / -1; }
-  .assistant-card { height: auto; }
-  .chat-log { max-height: 45vh; }
+.panel.collapsed > .pane-body { display: none; }
+
+/* Narrow the side columns before sacrificing the gel; the user can collapse
+   either one to reclaim the space entirely. */
+@media (max-width: 1380px) {
+  .layout { --col-left: 400px; --col-right: 300px; }
 }
 @media (max-width: 900px) {
+  body { overflow: auto; display: block; }
   .layout { grid-template-columns: 1fr; }
+  .panel, .panel.collapsed { display: block; overflow: visible; }
+  .panel.collapsed > .pane-body { display: block; }
+  .pane-body, #pane-right > .pane-body { display: block; overflow: visible; }
+  .assistant-card { height: auto; }
+  .chat-log { flex: none; max-height: 45vh; }
+}
+
+/* ---------- pane collapse rails ---------- */
+.pane-toggle {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0;
+  width: 18px;
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  font: inherit;
+  font-size: 11px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+}
+.pane-toggle:hover { color: var(--accent); }
+.pane-toggle:focus-visible { outline: 1px solid var(--accent); outline-offset: 2px; }
+/* Expanded, the rail is just a hairline handle beside the cards. */
+.pane-toggle::before {
+  content: "";
+  flex: none;
+  width: 3px;
+  align-self: stretch;
+  margin: 2px 0 20px;
+  border-radius: 2px;
+  background: var(--border);
+}
+.pane-toggle:hover::before { background: var(--accent-dim); }
+.pane-caret::after { content: "‹"; font-size: 15px; line-height: 1; }
+#pane-right .pane-caret::after { content: "›"; }
+.panel.collapsed .pane-caret::after { content: "›"; }
+#pane-right.collapsed .pane-caret::after { content: "‹"; }
+/* The name only appears once collapsed, running up the rail. */
+.pane-name { display: none; }
+.panel.collapsed > .pane-toggle {
+  width: 100%;
+  flex-direction: column;
+  gap: 10px;
+  padding-top: 4px;
+}
+.panel.collapsed .pane-name {
+  display: block;
+  writing-mode: vertical-rl;
+  transform: rotate(180deg);
+  white-space: nowrap;
+}
+.panel.collapsed > .pane-toggle::before { display: none; }
+/* Left rail hugs the gel side; right rail hugs the other. */
+#pane-left > .pane-toggle { order: 2; }
+#pane-left.collapsed > .pane-toggle { order: 0; }
+
+/* Stacked, there are no columns to reclaim, so the rails go away entirely.
+   Declared after the rail rules above so it wins on source order. */
+@media (max-width: 900px) {
+  .pane-toggle, .panel.collapsed > .pane-toggle { display: none; }
 }
 
 .card-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 10px; }
@@ -377,10 +456,10 @@ details summary { cursor: pointer; color: var(--muted); font-size: 13px; margin-
 }
 
 /* ---------- AI assistant ---------- */
-/* The assistant owns the right-hand column. The panel itself doesn't scroll —
-   the transcript does, so the composer stays put at the bottom instead of
-   drifting off-screen as the conversation grows. */
-.panel.assistant { overflow-y: hidden; display: flex; }
+/* The assistant owns the right-hand column. Its pane body doesn't scroll — the
+   transcript does, so the composer stays put at the bottom instead of drifting
+   off-screen as the conversation grows. */
+#pane-right > .pane-body { display: flex; overflow: hidden; }
 .assistant-card {
   display: flex; flex-direction: column;
   flex: 1; min-height: 0; margin-bottom: 0;
