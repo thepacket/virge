@@ -222,6 +222,12 @@ and nothing else in VIRGE is affected.
 There is **no server component** — the browser calls `api.anthropic.com`
 directly, so the assistant works in a static build exactly as it does in dev.
 
+**Clear** (above Send) drops the conversation the assistant remembers, so the
+next question starts from nothing — useful when you switch topic and don't want
+earlier turns steering the answer, or to stop paying to resend a long history.
+It leaves your key, the gel and its lanes alone; it is disabled when there is no
+conversation to clear and while a reply is in flight.
+
 **Understand the tradeoff before using it.** Holding an API key in a page means
 anything else running in that page — a browser extension, or any script that
 gets injected — can read it. That is why the SDK calls the option

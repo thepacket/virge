@@ -199,12 +199,26 @@ function setKey(key) {
   renderKeyState();
 }
 
+/** Drop the conversation the model sees, and the transcript showing it.
+ *  Keeps the opening greeting and the suggestion chips. */
+function clearConversation() {
+  history.length = 0;
+  $("#chat-log")
+    .querySelectorAll(".chat-msg:not(:first-child), .chat-tool")
+    .forEach((n) => n.remove());
+  updateClearState();
+}
+
 function forgetKey() {
   try { localStorage.removeItem(KEY_STORAGE); } catch { /* ignore */ }
   client = null;
-  history.length = 0;
-  $("#chat-log").querySelectorAll(".chat-msg:not(:first-child), .chat-tool").forEach((n) => n.remove());
+  clearConversation();
   renderKeyState();
+}
+
+/** Nothing to clear until there is a conversation, and never mid-turn. */
+function updateClearState() {
+  $("#chat-clear").disabled = busy || history.length === 0;
 }
 
 /** Show only enough of the key to recognise it — never the whole value. */
@@ -358,6 +372,7 @@ async function sendMessage(text) {
 function setInputEnabled(on) {
   $("#chat-input").disabled = !on;
   $("#chat-send").disabled = !on;
+  updateClearState();
 }
 
 // ---------- wiring ----------
@@ -385,6 +400,13 @@ export function initAssistant() {
   $("#chat-key-forget").addEventListener("click", () => {
     forgetKey();
     bubble("assistant", "Key forgotten and this conversation cleared.");
+  });
+
+  $("#chat-clear").addEventListener("click", () => {
+    if (busy) return;
+    clearConversation();
+    bubble("assistant", "Context cleared — I've forgotten this conversation. The gel and its lanes are untouched.");
+    $("#chat-input").focus();
   });
 
   const form = $("#chat-form");

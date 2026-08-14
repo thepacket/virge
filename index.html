@@ -162,7 +162,11 @@
         </div>
         <form id="chat-form" class="chat-form">
           <textarea id="chat-input" rows="2" placeholder="Ask, or tell me what to set up…" spellcheck="false"></textarea>
-          <button type="submit" id="chat-send" class="btn">Send</button>
+          <div class="chat-actions">
+            <button type="button" id="chat-clear" class="btn"
+                    title="Forget this conversation — the assistant starts fresh with no memory of it">Clear</button>
+            <button type="submit" id="chat-send" class="btn">Send</button>
+          </div>
         </form>
       </details>
     </aside>
