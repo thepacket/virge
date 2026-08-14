@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>VIRGE — Virtual Gel Electrophoresis</title>
+  <link rel="stylesheet" href="/src/style.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <span class="logo">🧬</span>
+      <h1>VIRGE</h1>
+      <span class="subtitle">Virtual Restriction dIgest &amp; Gel Electrophoresis</span>
+    </div>
+  </header>
+
+  <main class="layout">
+    <!-- Left panel: DNA + enzymes -->
+    <aside class="panel controls">
+      <details class="card section" id="sec-dna" open>
+        <summary class="card-head"><h2>1 · DNA Source</h2></summary>
+        <div id="dna-groups" class="dna-groups"></div>
+        <div class="dna-meta" id="dna-meta"></div>
+        <div id="import-status" class="hint" role="status"></div>
+        <label class="methyl-row">Methylation
+          <select id="methylation">
+            <option value="none">None — PCR product / synthetic DNA</option>
+            <option value="dam_dcm" selected>E. coli dam⁺/dcm⁺ — standard miniprep</option>
+            <option value="cpg">Eukaryotic — CpG methylated</option>
+          </select>
+        </label>
+        <details id="paste-details">
+          <summary>Load your own sequence</summary>
+
+          <div id="dropzone" class="dropzone">
+            <strong>Drop a file here</strong>
+            <span class="hint">GenBank (.gb, .gbk) or FASTA (.fa, .fasta) — annotations are read too</span>
+            <button id="pick-file" class="btn ghost small">Choose file…</button>
+            <input type="file" id="file-input" accept=".gb,.gbk,.genbank,.fa,.fasta,.fna,.seq,.txt" hidden />
+          </div>
+
+          <div class="row">
+            <input type="text" id="accession-input" placeholder="Or fetch by accession (e.g. NC_005816)" />
+            <button id="fetch-accession" class="btn">Fetch</button>
+          </div>
+
+          <textarea id="seq-input" rows="4" spellcheck="false"
+            placeholder="…or paste GenBank, FASTA, or raw sequence"></textarea>
+          <div class="row">
+            <label class="inline"><input type="radio" name="topo" value="auto" checked /> Auto</label>
+            <label class="inline"><input type="radio" name="topo" value="circular" /> Circular</label>
+            <label class="inline"><input type="radio" name="topo" value="linear" /> Linear</label>
+            <button id="load-seq" class="btn">Load pasted</button>
+          </div>
+        </details>
+      </details>
+
+      <details class="card section" id="sec-enzymes" open>
+        <summary class="card-head">
+          <h2>2 · Restriction Enzymes</h2>
+          <button id="suggest-digests" class="btn primary small" title="Add lanes with digests that give a nice band pattern for this DNA">✨ Suggest</button>
+        </summary>
+        <div class="row filter-row">
+          <input type="search" id="enzyme-search" placeholder="Search name or alias (e.g. Esp3I)…" />
+          <select id="tier-filter">
+            <option value="1">Everyday</option>
+            <option value="2" selected>Common</option>
+            <option value="3">All</option>
+          </select>
+          <select id="cut-filter" title="Filter by how often each enzyme cuts the loaded DNA">
+            <option value="any" selected>Any</option>
+            <option value="cutters">Cutters</option>
+            <option value="unique">Unique (1×)</option>
+          </select>
+        </div>
+        <div id="enzyme-count" class="hint"></div>
+        <div id="enzyme-list" class="enzyme-grid"></div>
+        <div class="row">
+          <button id="add-lane" class="btn primary">Add lane with selection →</button>
+          <button id="clear-sel" class="btn ghost" title="Untick all selected enzymes">Clear selection</button>
+        </div>
+        <div id="ends-info" class="ends-info" hidden></div>
+        <div id="buffer-warning" class="warning" hidden></div>
+      </details>
+
+      <details class="card section" id="sec-gel" open>
+        <summary class="card-head"><h2>3 · Gel Setup</h2></summary>
+        <div class="row">
+          <label>Agarose
+            <select id="gel-pct">
+              <option value="0.7">0.7 %</option>
+              <option value="1" selected>1.0 %</option>
+              <option value="1.5">1.5 %</option>
+              <option value="2">2.0 %</option>
+            </select>
+          </label>
+          <label>Ladder
+            <select id="ladder-select">
+              <option value="1kb" selected>1 kb ladder</option>
+              <option value="100bp">100 bp ladder</option>
+            </select>
+          </label>
+          <button id="download-gel" class="btn ghost">Save PNG</button>
+        </div>
+        <label class="exposure-row">
+          <span>Exposure <span id="exposure-value" class="hint">1.0×</span></span>
+          <input type="range" id="exposure" min="-2" max="2.5" step="0.1" value="0" />
+        </label>
+        <label class="exposure-row">
+          <span>Contrast <span id="contrast-value" class="hint">normal</span></span>
+          <input type="range" id="contrast" min="0.25" max="1.6" step="0.05" value="0.5" />
+        </label>
+      </details>
+
+      <details class="card section" id="sec-library" open>
+        <summary class="card-head">
+          <h2>Library</h2>
+          <span>
+            <button id="export-lib" class="btn ghost small">Export</button>
+            <button id="import-lib" class="btn ghost small">Import</button>
+          </span>
+        </summary>
+        <input type="file" id="import-file" accept=".json,application/json" hidden />
+        <div class="row">
+          <input type="text" id="config-name" placeholder="Configuration name…" />
+          <button id="save-config" class="btn primary">Save</button>
+        </div>
+        <div id="lib-status" class="hint" role="status"></div>
+        <div id="config-list" class="config-list"></div>
+      </details>
+    </aside>
+
+    <!-- Right: gel + results -->
+    <section class="panel results">
+      <div class="gel-wrap card">
+        <canvas id="gel-canvas" width="760" height="560"></canvas>
+      </div>
+      <div class="card" id="lanes-card">
+        <div class="card-head">
+          <h2>Lanes &amp; Fragments</h2>
+          <button id="clear-lanes" class="btn ghost small" title="Remove every digest lane from the gel">Clear lanes</button>
+        </div>
+        <div id="lane-table"></div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="footnote">
+    Sample sequences from NCBI GenBank (pUC19 L09137.2 · pBR322 J01749.1 · λ J02459.1 · φX174 NC_001422.1).
+    Migration modeled as log-linear in fragment size; band intensity scales with fragment mass.
+  </footer>
+
+  <script type="module" src="/src/main.js"></script>
+</body>
+</html>

@@ -1,0 +1,329 @@
+:root {
+  /* Tells the browser this is a dark surface, so native scrollbars, form
+     controls and focus rings render dark instead of the OS light default. */
+  color-scheme: dark;
+
+  --bg: #0d1117;
+  --panel: #161d27;
+  --card: #1b2430;
+  --border: #2a3648;
+  --text: #d7e2ee;
+  --muted: #8496a9;
+  --accent: #4ade80;
+  --accent-dim: #22c55e33;
+  --scroll-thumb: #33415a;
+  --scroll-thumb-hover: #46587a;
+}
+
+* { box-sizing: border-box; }
+
+/* Scrollbars styled to the panel surfaces. Firefox uses the two-value
+   scrollbar-color; WebKit/Blink use the pseudo-elements below. */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--scroll-thumb) transparent;
+}
+::-webkit-scrollbar { width: 11px; height: 11px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb {
+  background: var(--scroll-thumb);
+  border-radius: 8px;
+  /* Transparent border insets the thumb so it reads as a slim pill. */
+  border: 3px solid transparent;
+  background-clip: content-box;
+}
+::-webkit-scrollbar-thumb:hover { background: var(--scroll-thumb-hover); background-clip: content-box; }
+::-webkit-scrollbar-corner { background: transparent; }
+
+html, body { height: 100%; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font: 14px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.topbar {
+  padding: 14px 22px;
+  border-bottom: 1px solid var(--border);
+  background: var(--panel);
+}
+.brand { display: flex; align-items: baseline; gap: 10px; }
+.logo { font-size: 22px; }
+.brand h1 { margin: 0; font-size: 22px; letter-spacing: 2px; color: var(--accent); }
+.subtitle { color: var(--muted); font-size: 12px; }
+
+.layout {
+  display: grid;
+  /* Wide enough for two columns of enzymes at their natural width, so the
+     panel never needs a horizontal scrollbar. Only the four homing
+     endonucleases (18–39 bp sites) still ellipsise; their full site is in the
+     row tooltip. */
+  grid-template-columns: 480px 1fr;
+  gap: 18px;
+  padding: 18px 22px 0;
+  width: 100%;
+  box-sizing: border-box;
+  flex: 1;
+  min-height: 0; /* allow children to shrink so they can scroll */
+}
+.panel {
+  overflow-y: auto;
+  min-height: 0;
+  padding-bottom: 18px;
+}
+@media (max-width: 900px) {
+  body { overflow: auto; display: block; }
+  .layout { grid-template-columns: 1fr; }
+  .panel { overflow-y: visible; }
+}
+
+.card-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 10px; }
+.card-head h2 { margin: 0; }
+
+/* Collapsible left-panel sections. The header is the summary, so the whole
+   strip is the hit target; buttons inside it stop propagation in main.js. */
+.card.section > summary {
+  cursor: pointer;
+  user-select: none;
+  list-style: none;
+  padding-right: 20px;
+  position: relative;
+}
+.card.section > summary::-webkit-details-marker { display: none; }
+.card.section > summary::after {
+  content: "▾";
+  position: absolute;
+  right: 0;
+  color: var(--muted);
+  font-size: 11px;
+  transition: transform .15s;
+}
+.card.section:not([open]) > summary::after { transform: rotate(-90deg); }
+.card.section:not([open]) > summary { margin-bottom: 0; }
+.card.section > summary:hover h2 { color: var(--text); }
+/* A collapsed section is just its header. */
+.card.section:not([open]) { padding-bottom: 12px; }
+
+.card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 14px 16px;
+  margin-bottom: 14px;
+}
+.card h2 { margin: 0 0 10px; font-size: 13px; text-transform: uppercase; letter-spacing: 1px; color: var(--muted); }
+
+select, textarea, button {
+  font: inherit;
+  color: var(--text);
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 7px;
+}
+select { padding: 6px 8px; max-width: 100%; }
+textarea { width: 100%; padding: 8px; resize: vertical; font-family: ui-monospace, monospace; font-size: 12px; margin-top: 8px; }
+
+.btn { padding: 7px 12px; cursor: pointer; }
+.btn:hover { border-color: var(--accent); }
+.btn.primary { background: var(--accent-dim); border-color: var(--accent); color: var(--accent); font-weight: 600; }
+.btn.ghost { background: transparent; }
+.btn.small { padding: 2px 7px; font-size: 12px; margin-left: auto; }
+.btn:disabled { opacity: 0.4; cursor: default; border-color: var(--border); color: var(--muted); }
+.btn.primary:disabled { background: transparent; }
+#add-lane { flex: 1; text-align: left; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.row { display: flex; gap: 10px; align-items: center; margin-top: 10px; flex-wrap: wrap; }
+.row label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--muted); }
+label.inline { flex-direction: row; align-items: center; gap: 5px; color: var(--text); }
+
+.dna-groups details { border: 1px solid var(--border); border-radius: 8px; margin-bottom: 6px; overflow: hidden; }
+.dna-groups summary {
+  cursor: pointer;
+  padding: 7px 10px;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--muted);
+  background: var(--panel);
+  user-select: none;
+}
+.dna-groups summary:hover { color: var(--text); }
+.dna-groups .count { float: right; font-weight: 400; color: var(--accent); }
+.dna-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 8px;
+  width: 100%;
+  padding: 6px 12px;
+  background: none;
+  border: none;
+  border-top: 1px solid var(--border);
+  border-radius: 0;
+  cursor: pointer;
+  text-align: left;
+}
+.dna-item:hover { background: var(--panel); }
+.dna-item.active { background: var(--accent-dim); }
+.dna-item.active .dna-name { color: var(--accent); }
+.dna-name { font-weight: 600; font-size: 13px; }
+.dna-size { font-size: 11px; color: var(--muted); white-space: nowrap; }
+
+#config-name { flex: 1; padding: 7px 10px; font-size: 13px; background: var(--panel); border: 1px solid var(--border); border-radius: 7px; color: var(--text); }
+.config-list { margin-top: 10px; }
+.config-row { display: flex; gap: 6px; align-items: stretch; margin-bottom: 4px; }
+.config-load {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 1px;
+  padding: 6px 10px;
+  cursor: pointer;
+  text-align: left;
+  background: var(--panel);
+}
+.config-load:hover { border-color: var(--accent); }
+.config-name { font-weight: 600; font-size: 13px; }
+.btn.danger { border-color: #e5534b; color: #e5534b; }
+#lib-status { margin-top: 8px; min-height: 1em; color: var(--accent); }
+
+.dropzone {
+  display: flex; flex-direction: column; align-items: center; gap: 5px;
+  padding: 14px 10px; margin-top: 10px; text-align: center;
+  border: 1px dashed var(--border); border-radius: 8px;
+  transition: border-color .12s, background .12s;
+}
+.dropzone.over { border-color: var(--accent); background: var(--accent-dim); }
+.dropzone .hint { font-size: 11px; }
+#accession-input {
+  flex: 1; min-width: 0; padding: 6px 9px; font-size: 12px;
+  background: var(--panel); border: 1px solid var(--border);
+  border-radius: 7px; color: var(--text);
+}
+#import-status { margin-top: 6px; color: var(--accent); }
+#import-status:empty { margin: 0; }
+#import-status.error { color: #e5806b; }
+
+/* Records that still need downloading read as available, not as missing. */
+.dna-item.lazy .dna-size { color: #7f93a8; font-style: italic; }
+body.busy { cursor: progress; }
+body.busy .dna-item { pointer-events: none; opacity: 0.6; }
+
+.dna-line { display: flex; align-items: stretch; border-top: 1px solid var(--border); }
+.dna-line .dna-item { border-top: none; flex: 1; }
+.dna-line .del-seq { margin: 0; padding: 0 8px; border: none; border-radius: 0; opacity: 0; }
+.dna-line:hover .del-seq { opacity: 1; }
+
+.frag-feat {
+  display: block; font-size: 10px; opacity: 0.75;
+  font-family: system-ui, sans-serif; line-height: 1.3;
+}
+
+.dna-meta { margin-top: 8px; font-size: 13px; color: var(--muted); }
+.dna-meta strong { color: var(--text); }
+details summary { cursor: pointer; color: var(--muted); font-size: 13px; margin-top: 8px; }
+.hint { color: var(--muted); font-size: 12px; }
+
+.filter-row { gap: 6px; }
+.filter-row input[type="search"] {
+  flex: 1; min-width: 0; padding: 6px 9px; font-size: 12px;
+  background: var(--panel); border: 1px solid var(--border);
+  border-radius: 7px; color: var(--text);
+}
+.filter-row select { font-size: 12px; padding: 5px 6px; }
+.filter-row .inline { font-size: 12px; white-space: nowrap; }
+#enzyme-count { margin: 6px 0 2px; }
+
+.methyl-row { display: flex; flex-direction: column; gap: 4px; margin-top: 10px; font-size: 12px; color: var(--muted); }
+.methyl-row select { font-size: 12px; }
+
+.ends-info {
+  margin-top: 8px; padding: 7px 9px; font-size: 12px;
+  background: var(--panel); border: 1px solid var(--border); border-radius: 7px;
+}
+.end-row { margin: 2px 0; }
+.end-row code {
+  font-family: ui-monospace, monospace; font-size: 12px;
+  color: var(--accent); background: var(--accent-dim);
+  padding: 0 4px; border-radius: 4px;
+}
+.end-row .hint { display: block; font-size: 11px; }
+
+.warning {
+  margin-top: 8px; padding: 6px 9px; font-size: 12px;
+  color: #f0c274; background: rgba(240,194,116,0.08);
+  border: 1px solid rgba(240,194,116,0.35); border-radius: 6px;
+}
+.lane-notes { margin-top: 3px; }
+.blocked-note { font-size: 11px; color: #f0c274; }
+.enzyme.iis .esite { color: #9bb8d8; }
+
+/* No inner scroller: the whole list is shown and the left panel scrolls it. */
+.enzyme-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px;
+  margin: 8px 0;
+}
+.enzyme {
+  display: grid;
+  grid-template-columns: auto auto minmax(0, 1fr) auto;
+  gap: 6px;
+  align-items: center;
+  padding: 4px 8px;
+  border-radius: 6px;
+  cursor: pointer;
+  border: 1px solid transparent;
+  min-width: 0; /* let the row shrink instead of widening the panel */
+}
+.enzyme:hover { background: var(--panel); border-color: var(--border); }
+.enzyme.nocut { opacity: 0.45; }
+.ename { font-weight: 600; font-size: 13px; white-space: nowrap; }
+/* Long Type IIS sites like GCGATG(10/14) truncate rather than stretching the
+   column; the full site is in the row's tooltip. */
+.esite {
+  font-family: ui-monospace, monospace; font-size: 11px; color: var(--muted);
+  min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.ecuts { font-size: 11px; color: var(--accent); white-space: nowrap; }
+
+.exposure-row {
+  display: flex; flex-direction: column; gap: 3px;
+  margin-top: 10px; font-size: 12px; color: var(--muted);
+}
+.exposure-row input[type="range"] {
+  width: 100%; accent-color: var(--accent); cursor: pointer;
+}
+#exposure-value { color: var(--accent); font-family: ui-monospace, monospace; }
+
+.gel-wrap { padding: 10px; }
+#gel-canvas { width: 100%; height: 560px; display: block; border-radius: 6px; }
+
+.lane-row { border-top: 1px solid var(--border); padding: 8px 0; }
+.lane-row:first-child { border-top: none; }
+.lane-head { display: flex; gap: 10px; align-items: center; }
+.lane-num { color: var(--muted); font-size: 12px; }
+.frags { margin-top: 4px; }
+.frag {
+  display: inline-block;
+  background: var(--accent-dim);
+  color: var(--accent);
+  border-radius: 5px;
+  padding: 1px 7px;
+  margin: 2px 2px 0 0;
+  font-family: ui-monospace, monospace;
+  font-size: 12px;
+}
+
+.footnote {
+  text-align: center;
+  color: var(--muted);
+  font-size: 11px;
+  padding: 10px 20px 24px;
+}

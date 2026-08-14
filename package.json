@@ -1,0 +1,21 @@
+{
+  "name": "virge",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "node scripts/test.mjs",
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "build:enzymes": "node scripts/build-enzymes.mjs",
+    "build:samples": "node scripts/build-samples.mjs"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "module",
+  "devDependencies": {
+    "vite": "^8.2.1"
+  }
+}

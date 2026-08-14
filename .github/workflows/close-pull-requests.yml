@@ -1,0 +1,41 @@
+# This project does not accept pull requests (see CONTRIBUTING.md).
+# GitHub has no setting to disable PRs on a public repository, so incoming ones
+# are closed automatically with an explanation.
+name: Close pull requests
+
+on:
+  pull_request_target:
+    types: [opened, reopened]
+
+permissions:
+  pull-requests: write
+
+jobs:
+  close:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/github-script@v7
+        with:
+          script: |
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: [
+                "Thanks for taking the time to write this.",
+                "",
+                "This repository does not accept pull requests, so I am closing it unread —",
+                "please don't take it as a comment on the change itself. See",
+                "[CONTRIBUTING.md](../blob/main/CONTRIBUTING.md).",
+                "",
+                "If you found a bug — especially one where the biology is wrong — please open",
+                "an issue instead; those are genuinely useful. If you want VIRGE to work",
+                "differently, the MIT licence lets you fork it and take it wherever you like."
+              ].join("\n")
+            });
+            await github.rest.pulls.update({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: context.issue.number,
+              state: "closed"
+            });
