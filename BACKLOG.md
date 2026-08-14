@@ -47,6 +47,17 @@ Model incomplete digestion — a fixed cut probability per site, producing the
 partial-digest ladder you actually see when an enzyme under-performs. Useful
 for teaching why a gel looks wrong.
 
+**Render it as a distribution, not a lane.** A tube holds ~10⁹ molecules, so a
+real partial-digest lane *is* the ensemble: every fragment that any subset of
+cut sites can produce, each at the intensity its probability gives it. Drawing
+one sampled cut pattern would be a single draw from that ensemble and would
+show a different gel on every click — wrong, not merely coarse. For n sites the
+enumeration is over the 2ⁿ subsets, so the intensity per size has to be
+accumulated analytically (the probability a given fragment survives is the
+product over its two ends being cut and its interior sites not being), not by
+Monte Carlo. The existing accumulated-intensity profile in `gel.js` already
+takes per-size weights, so the renderer needs nothing new.
+
 ## ~~4. Custom sequences as a saved group~~ — done
 
 Imports are now kept in a "Your sequences" group with per-item delete, and
