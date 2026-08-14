@@ -136,8 +136,27 @@
         <div id="config-list" class="config-list"></div>
       </details>
 
-      <details class="card section" id="sec-assistant" open>
-        <summary class="card-head"><h2>✨ Assistant</h2></summary>
+    </aside>
+
+    <!-- Middle: gel + results -->
+    <section class="panel results">
+      <div class="gel-wrap card">
+        <canvas id="gel-canvas" width="760" height="560"></canvas>
+      </div>
+      <div class="card" id="lanes-card">
+        <div class="card-head">
+          <h2>Lanes &amp; Fragments</h2>
+          <button id="clear-lanes" class="btn ghost small" title="Remove every digest lane from the gel">Clear lanes</button>
+        </div>
+        <div id="lane-table"></div>
+      </div>
+    </section>
+
+    <!-- Right panel: AI assistant -->
+    <aside class="panel assistant">
+      <div class="card assistant-card">
+        <div class="card-head"><h2>✨ Assistant</h2></div>
+
         <div id="chat-key-setup" class="key-setup">
           <form id="chat-key-form" class="row">
             <input type="password" id="chat-key-input" autocomplete="off" spellcheck="false"
@@ -174,22 +193,8 @@
             <button type="submit" id="chat-send" class="btn">Send</button>
           </div>
         </form>
-      </details>
+      </div>
     </aside>
-
-    <!-- Right: gel + results -->
-    <section class="panel results">
-      <div class="gel-wrap card">
-        <canvas id="gel-canvas" width="760" height="560"></canvas>
-      </div>
-      <div class="card" id="lanes-card">
-        <div class="card-head">
-          <h2>Lanes &amp; Fragments</h2>
-          <button id="clear-lanes" class="btn ghost small" title="Remove every digest lane from the gel">Clear lanes</button>
-        </div>
-        <div id="lane-table"></div>
-      </div>
-    </section>
   </main>
 
   <footer class="footnote">
