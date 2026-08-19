@@ -3,6 +3,16 @@
 A restriction digest simulator: load a plasmid, pick enzymes, and see the
 fragment sizes plus a rendered virtual agarose gel.
 
+**VIRGE is a teaching tool.** It exists to make the reasoning behind a digest
+visible — where an enzyme cuts and why, how fragment size becomes migration
+distance, what a band's brightness actually measures. The science is modelled
+rather than sketched, and the enzyme catalog is generated from REBASE rather
+than hand-typed, so what you see should hold up to scrutiny. But it models the
+DNA, not the reaction: VIRGE has no view on buffers, star activity or anything
+else that depends on what is in the tube besides the sequence. Treat it as a
+way to understand a digest before you plan one, not as the last check before
+you set one up.
+
 Live at **[virge.fly.dev](https://virge.fly.dev)**.
 
 ![VIRGE: pBI121 digested with HindIII, HindIII + EcoRI, PvuII and NcoI on a 0.7% gel, beside the annotated fragment table and the AI assistant explaining its imaging choices](docs/hero.png)
@@ -314,17 +324,22 @@ Type IIS enzymes are correctly reported as having a *variable* overhang, since
 they cut outside their recognition site and the end is set by the flanking
 sequence — which is precisely what makes Golden Gate assembly programmable.
 
-### Practical warnings
+### Reaction-compatibility warnings
 Selecting enzymes with different incubation temperatures (e.g. EcoRI at 37 °C
-with SmaI at 25 °C) flags a sequential-digest recommendation before you commit
-the lane.
+with SmaI at 25 °C) flags a sequential-digest recommendation — usually where
+people first meet the idea that two enzymes may not share a tube.
 
-**Not implemented:** per-enzyme buffer activity tables (the "% activity in
-NEBuffer r1.1/r2.1/r3.1/rCutSmart" matrix). That data is supplier catalog
-information, not present in REBASE, and it was left out rather than guessed —
-so the reaction-compatibility check currently covers temperature only. Confirm
-buffer choice against your supplier's chart. See [BACKLOG.md](BACKLOG.md#1-buffer-activity-tables--full-double-digest-feasibility)
-for what it would take to finish.
+**Out of scope:** per-enzyme buffer activity tables (the "% activity in
+NEBuffer r1.1/r2.1/r3.1/rCutSmart" matrix), star activity propensity and heat
+inactivation conditions. These are supplier catalog data rather than properties
+of the enzyme: absent from REBASE, particular to one vendor's product line, and
+revised on that vendor's schedule. VIRGE teaches *that* a double digest needs a
+compatible buffer, and deliberately declines to say *which* — that answer
+belongs to whoever sold you the enzyme, and a stale or guessed matrix in a tool
+people trust would be worse than none. Check your supplier's own chart. See
+[BACKLOG.md](BACKLOG.md#1-buffer-activity-tables--full-double-digest-feasibility)
+for what implementing it would involve, should the tool ever take on a
+bench-planning role.
 
 ### AI assistant
 A chat panel in the right-hand pane, backed by the Claude API. It answers
